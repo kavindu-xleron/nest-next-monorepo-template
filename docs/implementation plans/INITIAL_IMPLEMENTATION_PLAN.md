@@ -91,8 +91,19 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 - [x] `app.enableShutdownHooks()`.
 - [x] `@nestjs/terminus` with **separate** `/health/live` and `/health/ready`.
-- [x] Drain sequence on SIGTERM — the part most templates get wrong: 1. flip readiness to failing **first**, so the load balancer stops routing 2. wait a configurable drain interval 3. stop accepting connections, then close the pg pool 4. hard timeout that force-exits if a request hangs
+- [x] Drain sequence on SIGTERM — the part most templates get wrong:
+
+      1. flip readiness to failing **first**, so the load balancer stops routing
+      2. wait a configurable drain interval
+      3. hang up idle keep-alive sockets, then stop accepting connections
+      4. hard timeout that force-exits if a request hangs
+
 - [x] Tune `server.keepAliveTimeout` / `headersTimeout` for proxies.
+- [x] `closeIdleConnections()` after the drain. `server.close()` only waits for sockets to go idle on
+      their own, and Nest's `closeOpenConnections()` is a no-op unless `forceCloseConnections` was
+      passed to `NestFactory.create`. Without this, a load balancer's keep-alive socket kept the close
+      pending past the hard deadline, so every deploy ended in `exit(1)`. Covered by
+      `graceful-shutdown.service.spec.ts`.
 
 ## Phase 4 — Postgres + Drizzle
 
@@ -100,6 +111,19 @@ Must precede Phase 9: semantic-release derives versions from commit history.
       no app containers.** Local dev is `pnpm db:up` + `pnpm dev` on the host.
 - [ ] `pg` Pool (chosen over `postgres.js` for explicit pool sizing and a clean `pool.end()` in the
       Phase 3 drain) wired to a `DrizzleModule` exposing a typed db instance.
+- [ ] **Close the pool in `onApplicationShutdown`, never `onModuleDestroy`.** Nest's shutdown order
+      (verified in `@nestjs/core/nest-application-context.js`, `close()`) is:
+
+      1. `onModuleDestroy()`
+      2. `beforeApplicationShutdown()`  ← Phase 3's readiness flip and drain wait
+      3. `dispose()`                    ← the HTTP server closes here
+      4. `onApplicationShutdown()`
+
+      `onModuleDestroy` runs *first* — before the drain. Releasing the pool there would tear it down
+      seconds before the server stops accepting traffic, so every request arriving during the drain
+      window would fail on a dead pool. Step 4 is the only safe place. The same reasoning applies to
+      any resource in-flight requests still depend on (caches, message-broker channels).
+
 - [ ] Schema in `apps/api/src/database/schema/` — the API is the only consumer, so it does not need
       to be its own package.
 - [ ] `drizzle-kit generate` producing committed SQL migrations. Run `migrate` as a **separate
