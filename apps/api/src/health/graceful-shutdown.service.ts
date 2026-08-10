@@ -7,7 +7,11 @@ import {
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { HttpAdapterHost } from "@nestjs/core"
+import { PinoLogger } from "nestjs-pino"
 import { HealthService } from "./health.service"
+
+/** How long to wait for buffered logs to drain before giving up and exiting anyway. */
+const LOG_FLUSH_TIMEOUT_MS = 1000
 
 /**
  * Drives the shutdown sequence.
@@ -41,7 +45,8 @@ export class GracefulShutdownService
   constructor(
     private readonly healthService: HealthService,
     private readonly configService: ConfigService,
-    private readonly httpAdapterHost: HttpAdapterHost
+    private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly pinoLogger: PinoLogger
   ) {}
 
   async beforeApplicationShutdown(signal?: string): Promise<void> {
@@ -66,7 +71,7 @@ export class GracefulShutdownService
       this.logger.error(
         `Graceful shutdown deadline (${hardTimeout}ms) exceeded. Force exiting process.`
       )
-      process.exit(1)
+      this.flushLogsAndExit(1)
     }, hardTimeout)
     this.timeoutTimer.unref()
 
@@ -113,6 +118,41 @@ export class GracefulShutdownService
     this.logger.log(
       "Step 4: Closed idle keep-alive connections. In-flight requests are still allowed to finish."
     )
+  }
+
+  /**
+   * Exits, but not before buffered logs reach the destination.
+   *
+   * pino writes through an async transport (a worker thread whenever
+   * pino-pretty is enabled), so a bare `process.exit()` discards anything still
+   * queued — including the line explaining why we are exiting, which is the one
+   * line anyone investigating a stuck deploy actually needs.
+   *
+   * The fallback timer is deliberate: this path only runs because something is
+   * already hung, and a flush that never calls back must not be what keeps a
+   * process alive that we have given up on.
+   */
+  private flushLogsAndExit(code: number): void {
+    let exited = false
+    const exit = () => {
+      if (exited) {
+        return
+      }
+      exited = true
+      process.exit(code)
+    }
+
+    const fallback = setTimeout(exit, LOG_FLUSH_TIMEOUT_MS)
+
+    try {
+      this.pinoLogger.logger.flush(() => {
+        clearTimeout(fallback)
+        exit()
+      })
+    } catch {
+      clearTimeout(fallback)
+      exit()
+    }
   }
 
   onApplicationShutdown(signal?: string): void {
