@@ -49,21 +49,21 @@ reads them without a DB round trip, and are mirrored onto `users.role` so they a
 
 The API was scaffolded outside the monorepo's shared tooling and currently conflicts with it.
 
-- [ ] Delete `apps/api/.prettierrc` (single quotes / `trailingComma: all`) — it contradicts the root
+- [x] Delete `apps/api/.prettierrc` (single quotes / `trailingComma: all`) — it contradicts the root
       config (`semi: false`, double quotes, `trailingComma: es5`).
-- [ ] Drop `eslint-plugin-prettier` from the API. Formatting runs through the Prettier CLI, not as a
+- [x] Drop `eslint-plugin-prettier` from the API. Formatting runs through the Prettier CLI, not as a
       lint rule — as configured it made `pnpm lint` and `pnpm format` undo each other.
-- [ ] Reformat the API to repo style.
-- [ ] Add `packages/typescript-config/nestjs.json` (`strict: true`, decorators, CommonJS) and have the
+- [x] Reformat the API to repo style.
+- [x] Add `packages/typescript-config/nestjs.json` (`strict: true`, decorators, CommonJS) and have the
       API extend it. The API currently sets `noImplicitAny: false` and no `strict`, making the app
       that will hold all business logic the least type-safe one in the repo.
-- [ ] Point the API at `@workspace/eslint-config` with a Node/Nest layer.
-- [ ] Delete root `.eslintrc.js` — legacy eslintrc format that ESLint 9 flat config never reads.
-- [ ] `turbo.json`: add `test` / `test:e2e` tasks, `dist/**` outputs for the API (its builds are
+- [x] Point the API at `@workspace/eslint-config` with a Node/Nest layer.
+- [x] Delete root `.eslintrc.js` — legacy eslintrc format that ESLint 9 flat config never reads.
+- [x] `turbo.json`: add `test` / `test:e2e` tasks, `dist/**` outputs for the API (its builds are
       currently uncacheable), and `.env*` inputs.
-- [ ] Root `package.json`: add `test`, bump `engines.node` to `>=20.9.0` (required by `@clerk/backend`).
-- [ ] `.gitignore`: negate `!.env.example` — the current `.env*` rule makes committing one impossible.
-- [ ] Add `.editorconfig` and `.nvmrc`.
+- [x] Root `package.json`: add `test`, bump `engines.node` to `>=20.9.0` (required by `@clerk/backend`).
+- [x] `.gitignore`: negate `!.env.example` — the current `.env*` rule makes committing one impossible.
+- [x] Add `.editorconfig` and `.nvmrc`.
 
 ## Phase 1 — Commit hygiene
 
