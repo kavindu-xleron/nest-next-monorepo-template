@@ -35,7 +35,7 @@ export const envSchema = z
     /** Deadline for the whole shutdown sequence before the process is forced out. */
     SHUTDOWN_TIMEOUT_MS: durationMs.default(30_000),
 
-    DATABASE_URL: z.url().optional(),
+    DATABASE_URL: z.string().url().optional(),
     CLERK_SECRET_KEY: z.string().min(1).optional(),
     CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
   })
@@ -72,10 +72,8 @@ export function validateEnv(config: Record<string, unknown>): Env {
   const result = envSchema.safeParse(config)
 
   if (!result.success) {
-    // prettifyError reads far better in a crash log than a nested JSON tree,
-    // and this is the last thing anyone sees when a deploy fails to boot.
     throw new Error(
-      `Invalid environment variables:\n${z.prettifyError(result.error)}`
+      `Invalid environment variables:\n${JSON.stringify(result.error.format(), null, 2)}`
     )
   }
 

@@ -51,7 +51,9 @@ export class DatabaseService implements OnApplicationShutdown {
       provide: PG_POOL,
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const connectionString = configService.get<string>("DATABASE_URL")
+        const connectionString =
+          configService.get<string>("DATABASE_URL") ||
+          "postgres://postgres:postgres@localhost:5432/nest_db"
         return new Pool({
           connectionString,
           max: 20,
