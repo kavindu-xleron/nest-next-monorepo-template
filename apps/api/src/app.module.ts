@@ -8,6 +8,7 @@ import { AppService } from "./app.service"
 import { ProblemDetailsFilter } from "./common/filters/problem-details.filter"
 import { isHealthRoute } from "./common/http/health-route"
 import { validateEnv } from "./config/env.schema"
+import { DatabaseModule } from "./database/database.module"
 import { HealthModule } from "./health/health.module"
 
 @Module({
@@ -58,6 +59,7 @@ import { HealthModule } from "./health/health.module"
         }
       },
     }),
+    DatabaseModule,
     HealthModule,
   ],
   controllers: [AppController],
