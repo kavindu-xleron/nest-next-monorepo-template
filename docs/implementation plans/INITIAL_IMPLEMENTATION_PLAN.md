@@ -132,12 +132,12 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 5 — Contracts + user routes
 
-- [ ] `packages/contracts`: hand-authored Zod schemas + inferred types (see architecture note above).
-- [ ] `nestjs-zod` so one schema serves as both validation pipe and Swagger DTO.
-- [ ] Type-level conformance tests between contracts and Drizzle row types.
-- [ ] User CRUD + `GET /users/me`, cursor pagination, response whitelisting so internal columns
+- [x] `packages/contracts`: hand-authored Zod schemas + inferred types (see architecture note above).
+- [x] `nestjs-zod` so one schema serves as both validation pipe and Swagger DTO.
+- [x] Type-level conformance tests between contracts and Drizzle row types.
+- [x] User CRUD + `GET /users/me`, cursor pagination, response whitelisting so internal columns
       cannot leak.
-- [ ] `/api/v1` prefix with versioning enabled; Swagger at `/docs`.
+- [x] `/api/v1` prefix with versioning enabled; Swagger at `/docs`.
 
 ## Phase 6 — Access control (Clerk)
 
