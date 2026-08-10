@@ -89,10 +89,10 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 3 — Graceful shutdown
 
-- [ ] `app.enableShutdownHooks()`.
-- [ ] `@nestjs/terminus` with **separate** `/health/live` and `/health/ready`.
-- [ ] Drain sequence on SIGTERM — the part most templates get wrong: 1. flip readiness to failing **first**, so the load balancer stops routing 2. wait a configurable drain interval 3. stop accepting connections, then close the pg pool 4. hard timeout that force-exits if a request hangs
-- [ ] Tune `server.keepAliveTimeout` / `headersTimeout` for proxies.
+- [x] `app.enableShutdownHooks()`.
+- [x] `@nestjs/terminus` with **separate** `/health/live` and `/health/ready`.
+- [x] Drain sequence on SIGTERM — the part most templates get wrong: 1. flip readiness to failing **first**, so the load balancer stops routing 2. wait a configurable drain interval 3. stop accepting connections, then close the pg pool 4. hard timeout that force-exits if a request hangs
+- [x] Tune `server.keepAliveTimeout` / `headersTimeout` for proxies.
 
 ## Phase 4 — Postgres + Drizzle
 

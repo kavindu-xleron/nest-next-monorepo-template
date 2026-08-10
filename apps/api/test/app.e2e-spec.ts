@@ -7,7 +7,7 @@ import { AppModule } from "../src/app.module"
 describe("AppController (e2e)", () => {
   let app: INestApplication<App>
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
@@ -33,6 +33,22 @@ describe("AppController (e2e)", () => {
     expect(res.headers["x-request-id"]).toBe(customReqId)
   })
 
+  it("/health/live (GET) should return 200 OK", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/health/live")
+      .expect(200)
+
+    expect(res.body.status).toBe("ok")
+  })
+
+  it("/health/ready (GET) should return 200 OK when not draining", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/health/ready")
+      .expect(200)
+
+    expect(res.body.status).toBe("ok")
+  })
+
   it("should return RFC 7807 problem+json on 404 error", async () => {
     const res = await request(app.getHttpServer())
       .get("/unknown-route")
@@ -49,7 +65,7 @@ describe("AppController (e2e)", () => {
     )
   })
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close()
   })
 })

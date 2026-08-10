@@ -8,6 +8,8 @@ export const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
+  DRAIN_INTERVAL_MS: z.coerce.number().default(5000),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().default(30000),
   DATABASE_URL: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_PUBLISHABLE_KEY: z.string().optional(),

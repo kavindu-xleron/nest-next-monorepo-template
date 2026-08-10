@@ -7,6 +7,7 @@ import { AppController } from "./app.controller"
 import { AppService } from "./app.service"
 import { ProblemDetailsFilter } from "./common/filters/problem-details.filter"
 import { validateEnv } from "./config/env.schema"
+import { HealthModule } from "./health/health.module"
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { validateEnv } from "./config/env.schema"
         }
       },
     }),
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
