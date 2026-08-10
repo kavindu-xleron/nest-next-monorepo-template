@@ -5,13 +5,13 @@ Phases are ordered by dependency, not priority. Check items off as they land.
 
 ## Locked decisions
 
-| Area | Choice | Why |
-| --- | --- | --- |
-| ORM | **Drizzle** (`drizzle-orm` + `drizzle-kit`, `pg` driver) | SQL-first, light runtime, no codegen daemon |
-| Auth | **Clerk** (`@clerk/nextjs` on web, `@clerk/backend` in Nest) | Hosted identity; no password/refresh-token surface to own |
-| Contracts | **Hand-authored Zod** in `packages/contracts` | One schema validates Nest requests *and* types Next forms |
-| Release | **semantic-release** at repo root, single version line | Nothing is published to npm; we want tags + CHANGELOG + GitHub releases |
-| Docker | **Split**: dev services compose vs. app images | Local dev runs on host for fast HMR; app images are CI-only |
+| Area      | Choice                                                       | Why                                                                     |
+| --------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| ORM       | **Drizzle** (`drizzle-orm` + `drizzle-kit`, `pg` driver)     | SQL-first, light runtime, no codegen daemon                             |
+| Auth      | **Clerk** (`@clerk/nextjs` on web, `@clerk/backend` in Nest) | Hosted identity; no password/refresh-token surface to own               |
+| Contracts | **Hand-authored Zod** in `packages/contracts`                | One schema validates Nest requests _and_ types Next forms               |
+| Release   | **semantic-release** at repo root, single version line       | Nothing is published to npm; we want tags + CHANGELOG + GitHub releases |
+| Docker    | **Split**: dev services compose vs. app images               | Local dev runs on host for fast HMR; app images are CI-only             |
 
 ### Two architecture calls worth stating explicitly
 
@@ -26,7 +26,7 @@ should be free to change independently:
 - It would pull `drizzle-orm/pg-core` into the web bundle, since the web app imports contracts.
 
 Instead: contracts are hand-authored Zod, and type-level conformance tests (`expectTypeOf`) fail
-`typecheck` if the DB and contract shapes drift apart. `drizzle-zod` may still be used *inside*
+`typecheck` if the DB and contract shapes drift apart. `drizzle-zod` may still be used _inside_
 the API for internal insert/update validation.
 
 **2. Clerk owns identity, but we still keep a local `users` table.**
@@ -69,10 +69,10 @@ The API was scaffolded outside the monorepo's shared tooling and currently confl
 
 Must precede Phase 9: semantic-release derives versions from commit history.
 
-- [ ] `husky` + `@commitlint/cli` + `@commitlint/config-conventional`.
-- [ ] Scope enum from the workspaces: `api`, `web`, `ui`, `contracts`, `config`, `deps`, `release`.
-- [ ] `lint-staged` on `pre-commit`; `commitlint` on `commit-msg`; `turbo typecheck` on `pre-push`.
-- [ ] Root `"prepare": "husky"`.
+- [x] `husky` + `@commitlint/cli` + `@commitlint/config-conventional`.
+- [x] Scope enum from the workspaces: `api`, `web`, `ui`, `contracts`, `config`, `deps`, `release`.
+- [x] `lint-staged` on `pre-commit`; `commitlint` on `commit-msg`; `turbo typecheck` on `pre-push`.
+- [x] Root `"prepare": "husky"`.
 
 ## Phase 2 — Config + logging
 
@@ -91,11 +91,7 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 - [ ] `app.enableShutdownHooks()`.
 - [ ] `@nestjs/terminus` with **separate** `/health/live` and `/health/ready`.
-- [ ] Drain sequence on SIGTERM — the part most templates get wrong:
-      1. flip readiness to failing **first**, so the load balancer stops routing
-      2. wait a configurable drain interval
-      3. stop accepting connections, then close the pg pool
-      4. hard timeout that force-exits if a request hangs
+- [ ] Drain sequence on SIGTERM — the part most templates get wrong: 1. flip readiness to failing **first**, so the load balancer stops routing 2. wait a configurable drain interval 3. stop accepting connections, then close the pg pool 4. hard timeout that force-exits if a request hangs
 - [ ] Tune `server.keepAliveTimeout` / `headersTimeout` for proxies.
 
 ## Phase 4 — Postgres + Drizzle
