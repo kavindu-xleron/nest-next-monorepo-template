@@ -76,16 +76,16 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 2 — Config + logging
 
-- [ ] `@nestjs/config` with a Zod schema that fails fast at boot. Everything downstream (DB URL, Clerk
+- [x] `@nestjs/config` with a Zod schema that fails fast at boot. Everything downstream (DB URL, Clerk
       keys, log level) depends on this.
-- [ ] `nestjs-pino` + `pino`, with:
+- [x] `nestjs-pino` + `pino`, with:
   - `bufferLogs: true` + `app.useLogger()` so Nest's own bootstrap logs go through pino
   - `genReqId` honouring an inbound `x-request-id`, echoed back on the response
   - AsyncLocalStorage so `this.logger.log()` deep in a service carries the request ID automatically
   - redaction of `authorization`, `cookie`, `set-cookie`, `password`
   - `autoLogging.ignore` for health checks so they do not drown the logs
   - `pino-pretty` in dev only
-- [ ] Global exception filter emitting RFC 7807 `problem+json` including the correlation ID.
+- [x] Global exception filter emitting RFC 7807 `problem+json` including the correlation ID.
 
 ## Phase 3 — Graceful shutdown
 
