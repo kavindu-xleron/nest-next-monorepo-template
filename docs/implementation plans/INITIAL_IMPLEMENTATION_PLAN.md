@@ -107,11 +107,11 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 4 — Postgres + Drizzle
 
-- [ ] `docker/compose.dev.yml`: Postgres 17 with healthcheck and named volume. **Dev services only —
+- [x] `docker/compose.dev.yml`: Postgres 17 with healthcheck and named volume. **Dev services only —
       no app containers.** Local dev is `pnpm db:up` + `pnpm dev` on the host.
-- [ ] `pg` Pool (chosen over `postgres.js` for explicit pool sizing and a clean `pool.end()` in the
+- [x] `pg` Pool (chosen over `postgres.js` for explicit pool sizing and a clean `pool.end()` in the
       Phase 3 drain) wired to a `DrizzleModule` exposing a typed db instance.
-- [ ] **Close the pool in `onApplicationShutdown`, never `onModuleDestroy`.** Nest's shutdown order
+- [x] **Close the pool in `onApplicationShutdown`, never `onModuleDestroy`.** Nest's shutdown order
       (verified in `@nestjs/core/nest-application-context.js`, `close()`) is:
 
       1. `onModuleDestroy()`
@@ -124,11 +124,11 @@ Must precede Phase 9: semantic-release derives versions from commit history.
       window would fail on a dead pool. Step 4 is the only safe place. The same reasoning applies to
       any resource in-flight requests still depend on (caches, message-broker channels).
 
-- [ ] Schema in `apps/api/src/database/schema/` — the API is the only consumer, so it does not need
+- [x] Schema in `apps/api/src/database/schema/` — the API is the only consumer, so it does not need
       to be its own package.
-- [ ] `drizzle-kit generate` producing committed SQL migrations. Run `migrate` as a **separate
+- [x] `drizzle-kit generate` producing committed SQL migrations. Run `migrate` as a **separate
       deploy step**, never on app boot, and never `push` outside dev.
-- [ ] Seed script; conventions: UUIDv7 ids, `createdAt` / `updatedAt`.
+- [x] Seed script; conventions: UUIDv7 ids, `createdAt` / `updatedAt`.
 
 ## Phase 5 — Contracts + user routes
 
