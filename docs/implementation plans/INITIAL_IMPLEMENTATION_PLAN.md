@@ -141,14 +141,14 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 6 — Access control (Clerk)
 
-- [ ] `ClerkAuthGuard` using `@clerk/backend` `verifyToken()` — networkless after the JWKS cache warms.
-- [ ] Applied **globally** with a `@Public()` escape hatch, so routes are secure by default.
-- [ ] Webhook route for user sync (`rawBody: true`, Svix verification, `@Public()`).
-- [ ] JIT user upsert on first authenticated request.
-- [ ] `@Roles()` + `RolesGuard` reading the custom session claim.
-- [ ] CASL for ownership rules ("edit own profile, admin edits any").
-- [ ] `@nestjs/throttler`, `helmet`, CORS allowlist from config.
-- [ ] Injectable current-user provider so tests can swap in a fake identity.
+- [x] `ClerkAuthGuard` using `@clerk/backend` `verifyToken()` — networkless after the JWKS cache warms.
+- [x] Applied **globally** with a `@Public()` escape hatch, so routes are secure by default.
+- [x] Webhook route for user sync (`rawBody: true`, Svix verification, `@Public()`).
+- [x] JIT user upsert on first authenticated request.
+- [x] `@Roles()` + `RolesGuard` reading the custom session claim.
+- [x] CASL for ownership rules ("edit own profile, admin edits any").
+- [x] `@nestjs/throttler`, `helmet`, CORS allowlist from config.
+- [x] Injectable current-user provider so tests can swap in a fake identity.
 
 ## Phase 7 — Web integration
 
