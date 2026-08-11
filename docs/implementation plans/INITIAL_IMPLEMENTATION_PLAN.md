@@ -152,8 +152,8 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 7 — Web integration
 
-- [ ] `@clerk/nextjs` `<ClerkProvider>` + `clerkMiddleware()`; protected routes.
-- [ ] Typed API client sharing `packages/contracts`, attaching the Clerk token as a Bearer header.
+- [x] `@clerk/nextjs` `<ClerkProvider>` + `clerkMiddleware()`; protected routes.
+- [x] Typed API client sharing `packages/contracts`, attaching the Clerk token as a Bearer header.
 
 > Read `node_modules/next/dist/docs/` before writing any of this — per `AGENTS.md`, Next 16 differs
 > from prior conventions.
