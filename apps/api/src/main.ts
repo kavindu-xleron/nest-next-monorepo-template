@@ -2,13 +2,29 @@ import { Server } from "node:http"
 import { ConfigService } from "@nestjs/config"
 import { NestFactory } from "@nestjs/core"
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger"
+import helmet from "helmet"
 import { Logger } from "nestjs-pino"
 import { ZodValidationPipe, patchNestJsSwagger } from "nestjs-zod"
 import { AppModule } from "./app.module"
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true })
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  })
   app.useLogger(app.get(Logger))
+
+  const configService = app.get(ConfigService)
+
+  // Security HTTP headers
+  app.use(helmet())
+
+  // CORS configuration
+  const corsOrigin = configService.get<string>("CORS_ORIGIN", "*")
+  app.enableCors({
+    origin: corsOrigin === "*" ? true : corsOrigin.split(","),
+    credentials: true,
+  })
 
   // Global API route prefix (excluding health check probes)
   app.setGlobalPrefix("api/v1", {
@@ -45,7 +61,6 @@ async function bootstrap() {
   server.keepAliveTimeout = 65000
   server.headersTimeout = 66000
 
-  const configService = app.get(ConfigService)
   const port = configService.get<number>("PORT", 5001)
 
   await app.listen(port)

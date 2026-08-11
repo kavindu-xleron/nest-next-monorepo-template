@@ -103,6 +103,42 @@ export class UsersService {
   }
 
   /**
+   * Just-in-Time (JIT) provision/synchronization of local Postgres user record.
+   */
+  async ensureJitUser(payload: {
+    clerkId: string
+    email: string
+    role?: string
+    firstName?: string | null
+    lastName?: string | null
+  }): Promise<UserDto> {
+    const existing = await this.usersRepository.findByClerkId(payload.clerkId)
+    if (existing) {
+      return this.toUserDto(existing)
+    }
+
+    const existingByEmail = await this.usersRepository.findByEmail(
+      payload.email
+    )
+    if (existingByEmail) {
+      const updated = await this.usersRepository.update(existingByEmail.id, {
+        clerkId: payload.clerkId,
+      })
+      return this.toUserDto(updated!)
+    }
+
+    const created = await this.usersRepository.create({
+      clerkId: payload.clerkId,
+      email: payload.email,
+      role: payload.role || "user",
+      firstName: payload.firstName || null,
+      lastName: payload.lastName || null,
+    })
+
+    return this.toUserDto(created)
+  }
+
+  /**
    * Whitelisting: Transforms database User entity into public UserDto contract,
    * guaranteeing internal fields (clerkId, deletedAt) are stripped.
    */

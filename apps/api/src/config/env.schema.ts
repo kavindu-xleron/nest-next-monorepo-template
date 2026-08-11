@@ -15,7 +15,11 @@ import { z } from "zod"
  */
 
 /** Vars that may be absent while developing but must exist in a real deployment. */
-const REQUIRED_IN_PRODUCTION = ["DATABASE_URL"] as const
+const REQUIRED_IN_PRODUCTION = [
+  "DATABASE_URL",
+  "CLERK_SECRET_KEY",
+  "CLERK_WEBHOOK_SECRET",
+] as const
 
 const port = z.coerce.number().int().min(1).max(65_535)
 const durationMs = z.coerce.number().int().nonnegative()
@@ -38,6 +42,11 @@ export const envSchema = z
     DATABASE_URL: z.string().url().optional(),
     CLERK_SECRET_KEY: z.string().min(1).optional(),
     CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
+    CLERK_WEBHOOK_SECRET: z.string().min(1).optional(),
+
+    CORS_ORIGIN: z.string().default("*"),
+    THROTTLE_TTL_MS: durationMs.default(60_000),
+    THROTTLE_LIMIT: z.coerce.number().int().min(1).default(100),
   })
   .superRefine((env, ctx) => {
     // The drain runs *inside* the shutdown deadline. Configured the other way

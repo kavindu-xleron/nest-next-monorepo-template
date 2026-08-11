@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto"
 import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
-import { APP_FILTER } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { LoggerModule } from "nestjs-pino"
 import { AppController } from "./app.controller"
 import { AppService } from "./app.service"
+import { AuthModule } from "./auth/auth.module"
+import { ClerkAuthGuard } from "./auth/guards/clerk-auth.guard"
+import { RolesGuard } from "./auth/guards/roles.guard"
 import { ProblemDetailsFilter } from "./common/filters/problem-details.filter"
 import { isHealthRoute } from "./common/http/health-route"
 import { validateEnv } from "./config/env.schema"
 import { DatabaseModule } from "./database/database.module"
 import { HealthModule } from "./health/health.module"
 import { UsersModule } from "./users/users.module"
+import { WebhooksModule } from "./webhooks/webhooks.module"
 
 @Module({
   imports: [
@@ -60,9 +65,21 @@ import { UsersModule } from "./users/users.module"
         }
       },
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: configService.get<number>("THROTTLE_TTL_MS", 60000),
+          limit: configService.get<number>("THROTTLE_LIMIT", 100),
+        },
+      ],
+    }),
     DatabaseModule,
     HealthModule,
     UsersModule,
+    AuthModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [
@@ -70,6 +87,18 @@ import { UsersModule } from "./users/users.module"
     {
       provide: APP_FILTER,
       useClass: ProblemDetailsFilter,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ClerkAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

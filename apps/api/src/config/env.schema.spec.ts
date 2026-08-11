@@ -69,6 +69,8 @@ describe("validateEnv", () => {
     const productionEnv = {
       NODE_ENV: "production",
       DATABASE_URL: "postgres://user:pass@localhost:5432/app",
+      CLERK_SECRET_KEY: "sk_live_123",
+      CLERK_WEBHOOK_SECRET: "whsec_123",
     }
 
     it("requires DATABASE_URL in production", () => {
