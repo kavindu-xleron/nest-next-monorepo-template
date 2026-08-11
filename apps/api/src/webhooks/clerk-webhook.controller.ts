@@ -41,39 +41,34 @@ export class ClerkWebhookController {
   ): Promise<{ success: boolean }> {
     const webhookSecret = this.configService.get<string>("CLERK_WEBHOOK_SECRET")
 
-    // In dev/test without secret, allow testing webhook payload parsing
     if (!webhookSecret) {
-      const nodeEnv = this.configService.get<string>("NODE_ENV")
-      if (nodeEnv === "production") {
-        throw new UnauthorizedException(
-          "CLERK_WEBHOOK_SECRET is not configured"
-        )
-      }
+      throw new UnauthorizedException("CLERK_WEBHOOK_SECRET is not configured")
     }
 
-    if (webhookSecret && (!svixId || !svixTimestamp || !svixSignature)) {
+    if (!svixId || !svixTimestamp || !svixSignature) {
       throw new BadRequestException("Missing required Svix webhook headers")
     }
 
-    const payload = req.rawBody
-      ? req.rawBody.toString("utf8")
-      : JSON.stringify(req.body)
+    if (!req.rawBody) {
+      throw new BadRequestException(
+        "Raw request body is missing for Svix verification"
+      )
+    }
 
-    let evt: any = req.body
+    const payload = req.rawBody.toString("utf8")
+    const wh = new Webhook(webhookSecret)
+    let evt: any
 
-    if (webhookSecret) {
-      const wh = new Webhook(webhookSecret)
-      try {
-        evt = wh.verify(payload, {
-          "svix-id": svixId,
-          "svix-timestamp": svixTimestamp,
-          "svix-signature": svixSignature,
-        })
-      } catch (err) {
-        throw new UnauthorizedException(
-          `Invalid Svix webhook signature: ${(err as Error).message}`
-        )
-      }
+    try {
+      evt = wh.verify(payload, {
+        "svix-id": svixId,
+        "svix-timestamp": svixTimestamp,
+        "svix-signature": svixSignature,
+      })
+    } catch (err) {
+      throw new UnauthorizedException(
+        `Invalid Svix webhook signature: ${(err as Error).message}`
+      )
     }
 
     const eventType = evt.type

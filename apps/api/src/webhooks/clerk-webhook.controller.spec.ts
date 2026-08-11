@@ -3,6 +3,16 @@ import { UsersRepository } from "../users/users.repository"
 import { UsersService } from "../users/users.service"
 import { ClerkWebhookController } from "./clerk-webhook.controller"
 
+jest.mock("svix", () => {
+  return {
+    Webhook: jest.fn().mockImplementation(() => ({
+      verify: jest
+        .fn()
+        .mockImplementation((payload: string) => JSON.parse(payload)),
+    })),
+  }
+})
+
 describe("ClerkWebhookController", () => {
   let controller: ClerkWebhookController
   let configService: jest.Mocked<ConfigService>
@@ -13,6 +23,7 @@ describe("ClerkWebhookController", () => {
     configService = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key === "NODE_ENV") return "test"
+        if (key === "CLERK_WEBHOOK_SECRET") return "whsec_test123"
         return undefined
       }),
     } as unknown as jest.Mocked<ConfigService>
@@ -34,19 +45,22 @@ describe("ClerkWebhookController", () => {
   })
 
   it("should process user.created event and trigger ensureJitUser", async () => {
-    const mockReq = {
-      body: {
-        type: "user.created",
-        data: {
-          id: "clerk_123",
-          primary_email_address_id: "email_1",
-          email_addresses: [
-            { id: "email_1", email_address: "webhook@example.com" },
-          ],
-          first_name: "Clerk",
-          last_name: "User",
-        },
+    const payload = {
+      type: "user.created",
+      data: {
+        id: "clerk_123",
+        primary_email_address_id: "email_1",
+        email_addresses: [
+          { id: "email_1", email_address: "webhook@example.com" },
+        ],
+        first_name: "Clerk",
+        last_name: "User",
       },
+    }
+
+    const mockReq = {
+      body: payload,
+      rawBody: Buffer.from(JSON.stringify(payload)),
     } as any
 
     const result = await controller.handleClerkWebhook(
@@ -71,13 +85,16 @@ describe("ClerkWebhookController", () => {
       id: "user-1",
     } as any)
 
-    const mockReq = {
-      body: {
-        type: "user.deleted",
-        data: {
-          id: "clerk_123",
-        },
+    const payload = {
+      type: "user.deleted",
+      data: {
+        id: "clerk_123",
       },
+    }
+
+    const mockReq = {
+      body: payload,
+      rawBody: Buffer.from(JSON.stringify(payload)),
     } as any
 
     const result = await controller.handleClerkWebhook(

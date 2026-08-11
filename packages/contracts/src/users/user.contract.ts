@@ -28,3 +28,8 @@ export type CreateUserDto = z.infer<typeof CreateUserSchema>
 
 export const UpdateUserSchema = CreateUserSchema.partial()
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>
+
+export const UpdateUserMeSchema = CreateUserSchema.omit({
+  role: true,
+}).partial()
+export type UpdateUserMeDto = z.infer<typeof UpdateUserMeSchema>

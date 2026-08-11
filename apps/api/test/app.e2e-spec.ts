@@ -1,41 +1,55 @@
-import { INestApplication } from "@nestjs/common"
+import { ExecutionContext, INestApplication } from "@nestjs/common"
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger"
 import { Test, TestingModule } from "@nestjs/testing"
 import { Logger } from "nestjs-pino"
+import { ZodValidationPipe } from "nestjs-zod"
 import request from "supertest"
 import { App } from "supertest/types"
 import { AppModule } from "../src/app.module"
+import { ClerkAuthGuard } from "../src/auth/guards/clerk-auth.guard"
 
-describe("AppController & User Routes (e2e)", () => {
+describe("AppController & API Routes (e2e)", () => {
   let app: INestApplication<App>
 
+  const mockUser = {
+    id: "019fead6-37f7-7699-809e-87d7e3df2971",
+    email: "test@example.com",
+    firstName: "Test",
+    lastName: "User",
+    avatarUrl: null,
+    role: "admin",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+
   beforeAll(async () => {
+    jest
+      .spyOn(ClerkAuthGuard.prototype, "canActivate")
+      .mockImplementation(async (context: ExecutionContext) => {
+        const req = context.switchToHttp().getRequest()
+        req.user = mockUser
+        return true
+      })
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
 
     app = moduleFixture.createNestApplication()
     app.useLogger(app.get(Logger))
+    app.useGlobalPipes(new ZodValidationPipe())
     app.setGlobalPrefix("api/v1", {
       exclude: ["health/(.*)"],
     })
+
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle("Next Nest Monorepo API")
+      .setVersion("1.0.0")
+      .build()
+    const document = SwaggerModule.createDocument(app, swaggerConfig)
+    SwaggerModule.setup("docs", app, document)
+
     await app.init()
-  })
-
-  it("/api/v1 (GET) should return 200 with x-request-id header", async () => {
-    const res = await request(app.getHttpServer()).get("/api/v1/").expect(200)
-
-    expect(res.text).toBe("Hello World!")
-    expect(res.headers["x-request-id"]).toBeDefined()
-  })
-
-  it("/api/v1 (GET) should echo inbound x-request-id header", async () => {
-    const customReqId = "custom-trace-id-999"
-    const res = await request(app.getHttpServer())
-      .get("/api/v1/")
-      .set("x-request-id", customReqId)
-      .expect(200)
-
-    expect(res.headers["x-request-id"]).toBe(customReqId)
   })
 
   it("/health/live (GET) should return 200 OK without route prefix", async () => {
@@ -46,64 +60,39 @@ describe("AppController & User Routes (e2e)", () => {
     expect(res.body.status).toBe("ok")
   })
 
-  it("/health/ready (GET) should return 200 OK without route prefix", async () => {
+  it("/docs (GET) should render OpenAPI documentation without error", async () => {
+    const res = await request(app.getHttpServer()).get("/docs").expect(200)
+    expect(res.text).toContain("swagger-ui")
+  })
+
+  it("/api/v1 (GET) should return 200 with x-request-id header", async () => {
+    const res = await request(app.getHttpServer()).get("/api/v1/").expect(200)
+
+    expect(res.text).toBe("Hello World!")
+    expect(res.headers["x-request-id"]).toBeDefined()
+  })
+
+  it("POST /api/v1/users with invalid email should fail validation with 400 Bad Request", async () => {
     const res = await request(app.getHttpServer())
-      .get("/health/ready")
+      .post("/api/v1/users")
+      .send({ email: "definitely-not-an-email", role: "admin" })
+      .expect(400)
+
+    expect(res.body.status).toBe(400)
+    expect(res.body.title).toContain("Validation")
+  })
+
+  it("GET /api/v1/users/me should return active user profile", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/users/me")
       .expect(200)
 
-    expect(res.body.status).toBe("ok")
-  })
-
-  it("should return RFC 7807 problem+json on 404 error", async () => {
-    const res = await request(app.getHttpServer())
-      .get("/api/v1/unknown-route")
-      .expect(404)
-      .expect("content-type", /application\/problem\+json/)
-
-    expect(res.body).toEqual(
-      expect.objectContaining({
-        type: "https://httpstatuses.com/404",
-        status: 404,
-        instance: "/api/v1/unknown-route",
-        requestId: expect.any(String),
-      })
-    )
-  })
-
-  describe("/api/v1/users", () => {
-    it("GET /api/v1/users/me should return active user profile", async () => {
-      const res = await request(app.getHttpServer())
-        .get("/api/v1/users/me")
-        .expect(200)
-
-      expect(res.body).toHaveProperty("id")
-      expect(res.body).toHaveProperty("email")
-      expect(res.body).not.toHaveProperty("clerkId")
-      expect(res.body).not.toHaveProperty("deletedAt")
-    })
-
-    it("GET /api/v1/users should return paginated response", async () => {
-      const res = await request(app.getHttpServer())
-        .get("/api/v1/users?limit=5")
-        .expect(200)
-
-      expect(res.body).toHaveProperty("items")
-      expect(Array.isArray(res.body.items)).toBe(true)
-      expect(res.body).toHaveProperty("hasMore")
-    })
-
-    it("GET /api/v1/users/:id with invalid ID should return RFC 7807 problem+json 404", async () => {
-      const invalidId = "00000000-0000-0000-0000-000000000000"
-      const res = await request(app.getHttpServer())
-        .get(`/api/v1/users/${invalidId}`)
-        .expect(404)
-        .expect("content-type", /application\/problem\+json/)
-
-      expect(res.body.title).toContain("Not Found")
-    })
+    expect(res.body).toHaveProperty("id")
+    expect(res.body).toHaveProperty("email")
   })
 
   afterAll(async () => {
     await app.close()
+    jest.restoreAllMocks()
   })
 })

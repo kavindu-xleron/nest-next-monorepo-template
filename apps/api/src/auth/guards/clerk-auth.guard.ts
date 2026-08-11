@@ -33,33 +33,30 @@ export class ClerkAuthGuard implements CanActivate {
     const token = this.extractTokenFromHeader(authHeader)
     const secretKey = this.configService.get<string>("CLERK_SECRET_KEY")
 
-    // Development/Test fallback when Clerk API keys are absent
-    if (!secretKey || !token) {
-      const nodeEnv = this.configService.get<string>("NODE_ENV")
-      if (nodeEnv !== "production" && !token) {
-        // Mock default dev/test user identity for seamless local testing
-        const devUser = await this.usersService.findMe().catch(() => null)
-        if (devUser) {
-          request.user = devUser
-          return true
-        }
-      }
+    if (!token) {
+      throw new UnauthorizedException(
+        "Missing or malformed Authorization Bearer header"
+      )
+    }
 
-      if (!token) {
-        throw new UnauthorizedException(
-          "Missing or malformed Authorization Bearer header"
-        )
-      }
+    if (!secretKey) {
+      throw new UnauthorizedException(
+        "CLERK_SECRET_KEY authentication service is not configured"
+      )
     }
 
     try {
-      if (!secretKey) {
-        throw new UnauthorizedException(
-          "CLERK_SECRET_KEY authentication service is not configured"
-        )
-      }
+      const authorizedPartiesRaw = this.configService.get<string>(
+        "CLERK_AUTHORIZED_PARTIES"
+      )
+      const authorizedParties = authorizedPartiesRaw
+        ? authorizedPartiesRaw.split(",").map((s) => s.trim())
+        : undefined
 
-      const verified = await verifyToken(token, { secretKey })
+      const verified = await verifyToken(token, {
+        secretKey,
+        ...(authorizedParties && { authorizedParties }),
+      })
       const clerkId = verified.sub
       const email =
         (verified.email as string) ||

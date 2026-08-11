@@ -4,7 +4,7 @@ import { NestFactory } from "@nestjs/core"
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger"
 import helmet from "helmet"
 import { Logger } from "nestjs-pino"
-import { ZodValidationPipe, patchNestJsSwagger } from "nestjs-zod"
+import { ZodValidationPipe } from "nestjs-zod"
 import { AppModule } from "./app.module"
 
 async function bootstrap() {
@@ -20,9 +20,13 @@ async function bootstrap() {
   app.use(helmet())
 
   // CORS configuration
-  const corsOrigin = configService.get<string>("CORS_ORIGIN", "*")
+  const corsOrigin = configService.get<string>(
+    "CORS_ORIGIN",
+    "http://localhost:3000"
+  )
+  const origins = corsOrigin.split(",").map((o) => o.trim())
   app.enableCors({
-    origin: corsOrigin === "*" ? true : corsOrigin.split(","),
+    origin: origins,
     credentials: true,
   })
 
@@ -33,9 +37,6 @@ async function bootstrap() {
 
   // Global Zod validation pipe
   app.useGlobalPipes(new ZodValidationPipe())
-
-  // Patch Swagger to understand Zod schemas
-  patchNestJsSwagger()
 
   // Swagger OpenAPI configuration
   const swaggerConfig = new DocumentBuilder()

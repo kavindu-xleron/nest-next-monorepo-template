@@ -17,7 +17,11 @@ import { UsersRepository } from "./users.repository"
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
-  async findMe(): Promise<UserDto> {
+  async findMe(userId?: string): Promise<UserDto> {
+    if (userId) {
+      return this.findOne(userId)
+    }
+
     const paginated = await this.usersRepository.findPaginated(undefined, 1)
     const firstUser = paginated.items[0]
     if (!firstUser) {
@@ -114,7 +118,15 @@ export class UsersService {
   }): Promise<UserDto> {
     const existing = await this.usersRepository.findByClerkId(payload.clerkId)
     if (existing) {
-      return this.toUserDto(existing)
+      const updated = await this.usersRepository.update(existing.id, {
+        email: payload.email,
+        ...(payload.role !== undefined && { role: payload.role }),
+        ...(payload.firstName !== undefined && {
+          firstName: payload.firstName,
+        }),
+        ...(payload.lastName !== undefined && { lastName: payload.lastName }),
+      })
+      return this.toUserDto(updated || existing)
     }
 
     const existingByEmail = await this.usersRepository.findByEmail(
@@ -123,6 +135,11 @@ export class UsersService {
     if (existingByEmail) {
       const updated = await this.usersRepository.update(existingByEmail.id, {
         clerkId: payload.clerkId,
+        ...(payload.role !== undefined && { role: payload.role }),
+        ...(payload.firstName !== undefined && {
+          firstName: payload.firstName,
+        }),
+        ...(payload.lastName !== undefined && { lastName: payload.lastName }),
       })
       return this.toUserDto(updated!)
     }

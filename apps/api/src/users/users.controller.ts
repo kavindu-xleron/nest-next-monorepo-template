@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -13,19 +14,22 @@ import {
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger"
+import { PaginatedResponseDto, UserDto } from "@workspace/contracts"
+import { CurrentUser } from "../auth/decorators/current-user.decorator"
+import { Roles } from "../auth/decorators/roles.decorator"
 import {
   CreateUserDto,
   CursorPaginationQueryDto,
-  PaginatedResponseDto,
   UpdateUserDto,
-  UserDto,
-} from "@workspace/contracts"
+  UpdateUserMeDto,
+} from "./dto"
 import { UsersService } from "./users.service"
 
 @ApiTags("users")
@@ -37,13 +41,27 @@ export class UsersController {
   @ApiOperation({ summary: "Get current authenticated user profile" })
   @ApiOkResponse({ description: "Current user profile" })
   @ApiNotFoundResponse({ description: "No active user profile found" })
-  async findMe(): Promise<UserDto> {
-    return this.usersService.findMe()
+  async findMe(@CurrentUser() user: UserDto): Promise<UserDto> {
+    return this.usersService.findMe(user?.id)
+  }
+
+  @Patch("me")
+  @ApiOperation({ summary: "Update current authenticated user profile" })
+  @ApiOkResponse({ description: "Profile successfully updated" })
+  @ApiNotFoundResponse({ description: "User not found" })
+  @ApiConflictResponse({ description: "Email already taken" })
+  async updateMe(
+    @CurrentUser() user: UserDto,
+    @Body() dto: UpdateUserMeDto
+  ): Promise<UserDto> {
+    return this.usersService.update(user.id, dto)
   }
 
   @Get()
-  @ApiOperation({ summary: "Get cursor-paginated list of users" })
+  @Roles("admin")
+  @ApiOperation({ summary: "Get cursor-paginated list of users (Admin only)" })
   @ApiOkResponse({ description: "Paginated users response" })
+  @ApiForbiddenResponse({ description: "Admin role required" })
   async findAll(
     @Query() query: CursorPaginationQueryDto
   ): Promise<PaginatedResponseDto<UserDto>> {
@@ -51,26 +69,39 @@ export class UsersController {
   }
 
   @Get(":id")
-  @ApiOperation({ summary: "Get user by ID" })
+  @ApiOperation({ summary: "Get user by ID (Self or Admin)" })
   @ApiOkResponse({ description: "User details" })
   @ApiNotFoundResponse({ description: "User not found" })
-  async findOne(@Param("id") id: string): Promise<UserDto> {
+  @ApiForbiddenResponse({ description: "Access denied" })
+  async findOne(
+    @Param("id") id: string,
+    @CurrentUser() currentUser: UserDto
+  ): Promise<UserDto> {
+    if (currentUser?.role !== "admin" && currentUser?.id !== id) {
+      throw new ForbiddenException(
+        "Access denied: You can only view your own user record"
+      )
+    }
     return this.usersService.findOne(id)
   }
 
   @Post()
-  @ApiOperation({ summary: "Create a new user" })
+  @Roles("admin")
+  @ApiOperation({ summary: "Create a new user (Admin only)" })
   @ApiCreatedResponse({ description: "User successfully created" })
   @ApiConflictResponse({ description: "User with email already exists" })
+  @ApiForbiddenResponse({ description: "Admin role required" })
   async create(@Body() dto: CreateUserDto): Promise<UserDto> {
     return this.usersService.create(dto)
   }
 
   @Patch(":id")
-  @ApiOperation({ summary: "Update user details by ID" })
+  @Roles("admin")
+  @ApiOperation({ summary: "Update user details by ID (Admin only)" })
   @ApiOkResponse({ description: "User successfully updated" })
   @ApiNotFoundResponse({ description: "User not found" })
   @ApiConflictResponse({ description: "Email already taken" })
+  @ApiForbiddenResponse({ description: "Admin role required" })
   async update(
     @Param("id") id: string,
     @Body() dto: UpdateUserDto
@@ -79,10 +110,12 @@ export class UsersController {
   }
 
   @Delete(":id")
+  @Roles("admin")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: "Soft delete user by ID" })
+  @ApiOperation({ summary: "Soft delete user by ID (Admin only)" })
   @ApiNoContentResponse({ description: "User successfully deleted" })
   @ApiNotFoundResponse({ description: "User not found" })
+  @ApiForbiddenResponse({ description: "Admin role required" })
   async remove(@Param("id") id: string): Promise<void> {
     return this.usersService.remove(id)
   }

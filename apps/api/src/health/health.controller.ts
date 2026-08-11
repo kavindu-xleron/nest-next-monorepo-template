@@ -1,5 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from "@nestjs/common"
 import { HealthCheck, HealthCheckService } from "@nestjs/terminus"
+import { Public } from "../auth/decorators/public.decorator"
 import { HealthService } from "./health.service"
 
 @Controller("health")
@@ -9,12 +10,14 @@ export class HealthController {
     private readonly healthService: HealthService
   ) {}
 
+  @Public()
   @Get("live")
   @HealthCheck()
   checkLiveness() {
     return this.healthCheckService.check([])
   }
 
+  @Public()
   @Get("ready")
   @HealthCheck()
   checkReadiness() {

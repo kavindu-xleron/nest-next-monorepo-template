@@ -32,7 +32,7 @@ describe("UsersController", () => {
   it("findOne should delegate to service.findOne and return UserDto", async () => {
     service.findOne.mockResolvedValue(mockUserDto)
 
-    const result = await controller.findOne(mockUserDto.id)
+    const result = await controller.findOne(mockUserDto.id, mockUserDto)
 
     expect(result).toEqual(mockUserDto)
     expect(service.findOne).toHaveBeenCalledWith(mockUserDto.id)

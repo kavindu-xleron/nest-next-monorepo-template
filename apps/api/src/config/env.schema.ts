@@ -19,6 +19,7 @@ const REQUIRED_IN_PRODUCTION = [
   "DATABASE_URL",
   "CLERK_SECRET_KEY",
   "CLERK_WEBHOOK_SECRET",
+  "CORS_ORIGIN",
 ] as const
 
 const port = z.coerce.number().int().min(1).max(65_535)
@@ -43,8 +44,9 @@ export const envSchema = z
     CLERK_SECRET_KEY: z.string().min(1).optional(),
     CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
     CLERK_WEBHOOK_SECRET: z.string().min(1).optional(),
+    CLERK_AUTHORIZED_PARTIES: z.string().optional(),
 
-    CORS_ORIGIN: z.string().default("*"),
+    CORS_ORIGIN: z.string().default("http://localhost:3000"),
     THROTTLE_TTL_MS: durationMs.default(60_000),
     THROTTLE_LIMIT: z.coerce.number().int().min(1).default(100),
   })
