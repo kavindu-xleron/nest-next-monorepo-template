@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Releases must not run concurrently: two runs would race to compute the next
+# version from tags and could publish the same one twice. Never cancel a run in
+# progress — a half-finished release leaves a tag without a GitHub release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # `pnpm install` triggers the root `prepare` script, which installs husky's git
+  # hooks. In CI they serve no purpose, and commitlint would run against
+  # semantic-release's own release commit.
+  HUSKY: "0"
+  # The web build validates its environment and refuses to build without a Clerk
+  # publishable key. CI has no .env.local, so supply the real key when one is
+  # configured and fall back to a well-formed placeholder otherwise — enough to
+  # type-check and compile, never enough to authenticate.
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' }}
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm must be installed before setup-node, otherwise `cache: pnpm`
+      # cannot resolve the store path.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint, typecheck, test and build
+        run: pnpm turbo lint typecheck test build
+
+  release:
+    name: Release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create tags, releases, and push the release commit
+      issues: write # comment on issues resolved by a release
+      pull-requests: write # comment on the PRs included in a release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # semantic-release determines the last release from tags and reads the
+          # full commit history to compute the next version. A shallow clone
+          # makes it think every run is the first release.
+          fetch-depth: 0
+          # Let semantic-release authenticate with GITHUB_TOKEN rather than the
+          # credentials checkout would otherwise persist in .git/config.
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Release
+        run: pnpm exec semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

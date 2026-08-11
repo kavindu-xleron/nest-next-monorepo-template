@@ -15,22 +15,31 @@
     "db:down": "docker compose -f docker/compose.dev.yml down",
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",
-    "db:seed": "pnpm --filter api db:seed"
+    "db:seed": "pnpm --filter api db:seed",
+    "release:dry": "semantic-release --dry-run --no-ci"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",
     "@commitlint/config-conventional": "^19.8.0",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^11.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
+    "conventional-changelog-conventionalcommits": "^10.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "semantic-release": "^25.0.9",
     "turbo": "^2.9.18",
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.33.4",
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.14.0"
   }
 }
