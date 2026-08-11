@@ -151,10 +151,15 @@ See `docs/RELEASING.md`.
 
 ## Conventions
 
-Commits follow Conventional Commits and are linted on `commit-msg`; allowed scopes
-are listed in `commitlint.config.js`. `feat` produces a minor release, `fix` and
-`perf` a patch, and `BREAKING CHANGE:` a major. `docs`, `chore`, `ci`, `style`,
-`test` and `build` produce no release at all — see `docs/COMMIT_CONVENTIONS.md`.
+Commits follow Conventional Commits, enforced by commitlint on `commit-msg`. A
+scope is optional but encouraged, and must come from the enum in
+`commitlint.config.js` when used. The type decides the version bump and whether
+the change appears in the changelog at all — broadly, only `feat`, `fix` and
+`perf` are published to users.
+
+`docs/COMMIT_CONVENTIONS.md` holds the full type → release → changelog table and
+is the source of truth; it is deliberately not restated here, because the copy
+that drifts is the one people read.
 
 ## Known gaps
 

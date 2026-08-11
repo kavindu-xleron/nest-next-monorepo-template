@@ -15,19 +15,14 @@ if the verify job passed, so a broken `main` cannot be released.
 
 ## What triggers a version bump
 
-Derived from the Conventional Commit types that `commitlint` already enforces:
+The version is derived from the Conventional Commit types that `commitlint`
+already enforces. **`docs/COMMIT_CONVENTIONS.md` holds the full table** — which
+type produces which bump, and which types are published in the changelog. It is
+the single source of truth and is not duplicated here; a copy of that mapping in
+a second document is how it silently went out of date once already.
 
-| Commit                                         | Result         |
-| ---------------------------------------------- | -------------- |
-| `feat: ...`                                    | minor (0.1.0)  |
-| `fix: ...`                                     | patch (0.0.1)  |
-| `perf: ...` / `refactor: ...`                  | patch          |
-| anything with `scope: deps`                    | patch          |
-| `docs` `style` `test` `chore` `ci` `build`     | **no release** |
-| any type with `BREAKING CHANGE:` in the footer | major          |
-
-The last row is the one to remember: a long run of `chore:` and `docs:` commits
-produces no release at all, and that is intended rather than a failure.
+The part worth remembering in this context: a long run of `chore:` and `docs:`
+commits produces **no release at all**. That is intended, not a failure.
 
 ## Checking what would be released
 
