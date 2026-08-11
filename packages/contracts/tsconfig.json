@@ -1,6 +1,9 @@
 {
   "extends": "@workspace/typescript-config/base.json",
   "compilerOptions": {
+    // NodeNext, not Bundler. Bundler resolution accepts extensionless relative
+    // imports, which typecheck cleanly and then fail at runtime under Node's
+    // resolver — that mismatch is what let a broken package pass every check.
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "rootDir": "src",
