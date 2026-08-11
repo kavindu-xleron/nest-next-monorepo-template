@@ -59,6 +59,18 @@ workflow, so no secret needs creating.
 
 ## Things that are deliberate
 
+**No `preset` is configured — the default is used on purpose.** Setting
+`preset: "conventionalcommits"` looks like the obvious choice given commitlint,
+and it produced release notes with no sections at all: a bare `## 1.0.0` header
+and nothing under it. The cause is that `@semantic-release/release-notes-generator`
+resolves `conventional-changelog-conventionalcommits` from its **own** dependency
+tree, where pnpm has nested version 7, while a root-level install lands version 10
+that the plugin never loads. The two versions take different `presetConfig`
+shapes, so the config silently fails to match and the writer falls back to an
+ungrouped list. The default preset needs no extra package and groups correctly
+into Features and Bug Fixes. If you ever add a preset back, verify the notes with
+`pnpm release:dry` rather than trusting that the config was applied.
+
 **`HUSKY: "0"` in the workflow.** `pnpm install` runs the root `prepare` script,
 which installs husky's git hooks. In CI they only get in the way — and
 commitlint would run against semantic-release's own release commit.
