@@ -168,10 +168,21 @@ Must precede Phase 9: semantic-release derives versions from commit history.
 
 ## Phase 9 — semantic-release
 
-- [ ] Root `semantic-release` on `main`, CI-only, gated behind Phase 8's tests.
-- [ ] `commit-analyzer`, `release-notes-generator`, `changelog`, `git`, `github`.
-- [ ] Tag drives versioned Docker image tags.
-- [ ] Needs `contents: write` permission; release commit carries `[skip ci]`.
+See `docs/RELEASING.md` for the resulting process and the reasoning behind each setting.
+
+- [x] Root `semantic-release` on `main`, CI-only, gated behind a verify job. Phase 8 was skipped, so
+      the gate runs `lint typecheck test build` inside the release workflow rather than reusing a
+      shared CI workflow. Pull requests are still ungated.
+- [x] `commit-analyzer`, `release-notes-generator`, `changelog`, `npm` (`npmPublish: false`, purely
+      to keep the root version in sync), `git`, `github`.
+- [x] Needs `contents: write` permission; release commit carries `[skip ci]`.
+- [x] **Node bumped to 22 LTS** (`.nvmrc` 22.23.2, `engines >= 22.14.0`). The release toolchain
+      requires `^22.14.0 || >=24.10.0`, and Node 20 reached end of life in April 2026, so the
+      previous pin of 20.18.0 was both incompatible and unsupported.
+- [ ] Tag drives versioned Docker image tags — deferred with the rest of Phase 8.
+- [ ] **Blocked: the repository has no git remote.** `@semantic-release/github` publishes through the
+      GitHub API, so the release job cannot run until `git remote -v` shows a GitHub repository.
+      No secret is needed; `GITHUB_TOKEN` is provided to the workflow automatically.
 
 > If `@workspace/ui` is ever published to npm, switch to Changesets — semantic-release's single
 > version line only works while every package stays private.
