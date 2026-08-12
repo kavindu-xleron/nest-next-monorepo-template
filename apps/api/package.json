@@ -20,8 +20,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "ts-node -r tsconfig-paths/register src/database/migrate.ts",
-    "db:seed": "ts-node -r tsconfig-paths/register src/database/seed.ts"
+    "db:migrate": "ts-node -r tsconfig-paths/register src/core/database/migrate.ts",
+    "db:seed": "ts-node -r tsconfig-paths/register src/core/database/seed.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.0",

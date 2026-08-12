@@ -10,7 +10,7 @@ import {
   UpdateUserDto,
   UserDto,
 } from "@workspace/contracts"
-import { User } from "../database/schema/users"
+import { User } from "@core/database/schema/users"
 import { UsersRepository } from "./users.repository"
 
 @Injectable()

@@ -22,8 +22,8 @@ import {
   ApiTags,
 } from "@nestjs/swagger"
 import { PaginatedResponseDto, UserDto } from "@workspace/contracts"
-import { CurrentUser } from "../auth/decorators/current-user.decorator"
-import { Roles } from "../auth/decorators/roles.decorator"
+import { CurrentUser } from "@core/auth/decorators/current-user.decorator"
+import { Roles } from "@core/auth/decorators/roles.decorator"
 import {
   CreateUserDto,
   CursorPaginationQueryDto,

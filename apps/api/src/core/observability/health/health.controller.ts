@@ -1,6 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from "@nestjs/common"
 import { HealthCheck, HealthCheckService } from "@nestjs/terminus"
-import { Public } from "../auth/decorators/public.decorator"
+import { Public } from "@core/auth/decorators/public.decorator"
 import { HealthService } from "./health.service"
 
 @Controller("health")

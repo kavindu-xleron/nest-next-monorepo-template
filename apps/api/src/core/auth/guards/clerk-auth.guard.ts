@@ -7,7 +7,8 @@ import {
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { Reflector } from "@nestjs/core"
-import { UsersService } from "../../users/users.service"
+// eslint-disable-next-line no-restricted-imports -- removed in Phase 4 (auth strategy)
+import { UsersService } from "@modules/users/users.service"
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator"
 
 @Injectable()

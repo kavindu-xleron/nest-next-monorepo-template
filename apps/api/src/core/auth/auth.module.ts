@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
-import { UsersModule } from "../users/users.module"
+// eslint-disable-next-line no-restricted-imports -- removed in Phase 4 (auth strategy)
+import { UsersModule } from "@modules/users/users.module"
 import { ClerkAuthGuard } from "./guards/clerk-auth.guard"
 import { RolesGuard } from "./guards/roles.guard"
 

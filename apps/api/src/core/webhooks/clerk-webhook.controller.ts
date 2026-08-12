@@ -12,9 +12,11 @@ import { ConfigService } from "@nestjs/config"
 import { ApiOperation, ApiTags } from "@nestjs/swagger"
 import { Request } from "express"
 import { Webhook } from "svix"
-import { Public } from "../auth/decorators/public.decorator"
-import { UsersRepository } from "../users/users.repository"
-import { UsersService } from "../users/users.service"
+import { Public } from "@core/auth/decorators/public.decorator"
+// eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
+import { UsersRepository } from "@modules/users/users.repository"
+// eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
+import { UsersService } from "@modules/users/users.service"
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer

@@ -6,7 +6,7 @@ import { ZodValidationPipe } from "nestjs-zod"
 import request from "supertest"
 import { App } from "supertest/types"
 import { AppModule } from "../src/app.module"
-import { ClerkAuthGuard } from "../src/auth/guards/clerk-auth.guard"
+import { ClerkAuthGuard } from "../src/core/auth/guards/clerk-auth.guard"
 
 describe("AppController & API Routes (e2e)", () => {
   let app: INestApplication<App>
