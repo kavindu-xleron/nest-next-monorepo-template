@@ -129,16 +129,23 @@ and therefore need different mappings for the same alias.
   }
   ```
 
-- [ ] `apps/api/test/jest-e2e.json` (`rootDir: "."` — note the extra `src/`):
+- [ ] `apps/api/test/jest-e2e.json` — **note the `../`**:
 
   ```json
   "moduleNameMapper": {
     "^(\\.{1,2}/.*)\\.js$": "$1",
-    "^@core/(.*)$": "<rootDir>/src/core/$1",
-    "^@modules/(.*)$": "<rootDir>/src/modules/$1",
-    "^@shared/(.*)$": "<rootDir>/src/shared/$1"
+    "^@core/(.*)$": "<rootDir>/../src/core/$1",
+    "^@modules/(.*)$": "<rootDir>/../src/modules/$1",
+    "^@shared/(.*)$": "<rootDir>/../src/shared/$1"
   }
   ```
+
+  The config says `rootDir: "."`, but **Jest resolves `rootDir` relative to the directory holding
+  the config file**, not the package root. Since `jest-e2e.json` lives in `test/`, `<rootDir>` is
+  `apps/api/test` — so the mapping needs to climb out before descending into `src/`. Confirm with
+  `pnpm --filter api exec jest --config ./test/jest-e2e.json --showConfig | grep rootDir` rather
+  than assuming; the unit config's `rootDir: "src"` resolves from the package root because it lives
+  in `package.json`, and the inconsistency is easy to miss.
 
 - [ ] Keep the existing `^(\\.{1,2}/.*)\\.js$` mapping first. It strips the `.js` extensions that
       `@workspace/contracts` requires (see the comment in `packages/contracts/src/index.ts`) and is
@@ -159,6 +166,17 @@ too.
 
   ```js
   import { nodeNestConfig } from "@workspace/eslint-config/node-nest"
+
+  const CROSS_MODULE_INTERNALS = {
+    group: [
+      "@modules/*/domain/**",
+      "@modules/*/application/**",
+      "@modules/*/infrastructure/**",
+      "@modules/*/presentation/**",
+    ],
+    message:
+      "Import another module through its index.ts barrel. Inside your own module, use relative paths.",
+  }
 
   /**
    * Architectural boundaries for the layered module structure.
@@ -188,7 +206,21 @@ too.
       },
     },
 
+    // Modules talk to each other through index.ts, never through internals.
+    {
+      files: ["src/modules/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          { patterns: [CROSS_MODULE_INTERNALS] },
+        ],
+      },
+    },
+
     // domain/ is plain types and ports. No framework, no driver, no vendor SDK.
+    //
+    // Ordering is load-bearing here, and getting it wrong fails SILENTLY.
+    // See the note below this code block.
     {
       files: ["src/modules/*/domain/**/*.ts"],
       rules: {
@@ -196,6 +228,7 @@ too.
           "error",
           {
             patterns: [
+              CROSS_MODULE_INTERNALS,
               {
                 group: [
                   "drizzle-orm",
@@ -214,30 +247,6 @@ too.
         ],
       },
     },
-
-    // Modules talk to each other through index.ts, never through internals.
-    {
-      files: ["src/modules/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              {
-                group: [
-                  "@modules/*/domain/**",
-                  "@modules/*/application/**",
-                  "@modules/*/infrastructure/**",
-                  "@modules/*/presentation/**",
-                ],
-                message:
-                  "Import another module through its index.ts barrel. Inside your own module, use relative paths.",
-              },
-            ],
-          },
-        ],
-      },
-    },
   ]
   ```
 
@@ -246,6 +255,26 @@ too.
   ```json
   "lint": "eslint --max-warnings 0",
   ```
+
+### Why the domain block comes last and repeats itself
+
+**Flat config replaces a rule's options rather than merging them.** When two blocks both set
+`no-restricted-imports` for the same file, the last one wins outright and the earlier one is
+discarded — silently. No conflict, no warning, the rule simply stops existing for that file.
+
+A file at `src/modules/users/domain/user.entity.ts` is matched by both `src/modules/**/*.ts` and
+`src/modules/*/domain/**/*.ts`. Put the domain block first — the intuitive choice, since it is the
+more specific pattern — and the general block overwrites it, so **domain purity is never enforced at
+all**. Verified by probe: with that ordering, a `domain/` file importing `drizzle-orm` produced no
+diagnostic.
+
+Hence the domain block goes last, and restates `CROSS_MODULE_INTERNALS` so that `domain/` files keep
+both protections rather than trading one for the other.
+
+- [ ] Prove it rather than trusting it. Drop a throwaway
+      `src/modules/probe/domain/probe.ts` importing both `drizzle-orm` and
+      `@modules/users/domain/user.entity`, run `pnpm --filter api lint`, and confirm **two** findings
+      with **different** messages. Delete the probe. One finding means the ordering has regressed.
 
 ### Expect Phase 1 to violate the first zone
 
@@ -278,6 +307,20 @@ Run in order. The last one is the one that matters.
       at the end of Phase 1, when the aliases are load-bearing.
 - [ ] `grep -r "@core/\|@modules/\|@shared/" apps/api/dist/` → **no matches** after Phase 1. Any hit
       means `tsc-alias` did not run and the build is broken in production only.
+
+### Probe the two silent failures before declaring this phase done
+
+Four of the checks above pass trivially while nothing yet uses an alias or violates a boundary. Both
+of the mechanisms they are supposed to guard fail _silently_, so force them once:
+
+- [ ] **Alias rewriting.** Write `src/shared/probe.ts` (`export const PROBE = "ok"`) and a
+      `src/probe-consumer.ts` importing it via `@shared/probe`. Run `pnpm --filter api build`, then
+      `grep require dist/probe-consumer.js` — it must read `./shared/probe`, not `@shared/probe` —
+      and `node -e "require('./dist/probe-consumer.js')"` must not throw. Delete both files.
+- [ ] **E2E alias mapping.** Add a one-line `test/probe.e2e-spec.ts` importing `@shared/probe` and
+      run the e2e suite. Delete it.
+- [ ] **Boundary zones.** The domain-block probe in §5.
+- [ ] Confirm `git status` is clean of probes before committing.
 
 ## Rollback
 
