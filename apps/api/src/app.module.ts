@@ -1,105 +1,24 @@
-import { randomUUID } from "node:crypto"
 import { Module } from "@nestjs/common"
-import { ConfigModule, ConfigService } from "@nestjs/config"
-import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
-import { LoggerModule } from "nestjs-pino"
+import { CoreModule } from "@core/core.module"
+import { AuthModule } from "@core/auth/auth.module"
+import { PrincipalResolver } from "@core/auth/ports/principal-resolver"
+import { TokenVerifier } from "@core/auth/ports/token-verifier"
+import { ClerkTokenVerifier } from "@core/auth/strategies/clerk/clerk-token-verifier"
+import { UserPrincipalResolver, UsersModule } from "@modules/users"
 import { AppController } from "./app.controller"
 import { AppService } from "./app.service"
-import { AuthModule } from "./auth/auth.module"
-import { ClerkAuthGuard } from "./auth/guards/clerk-auth.guard"
-import { RolesGuard } from "./auth/guards/roles.guard"
-import { ProblemDetailsFilter } from "./common/filters/problem-details.filter"
-import { isHealthRoute } from "./common/http/health-route"
-import { validateEnv } from "./config/env.schema"
-import { DatabaseModule } from "./database/database.module"
-import { HealthModule } from "./health/health.module"
-import { UsersModule } from "./users/users.module"
-import { WebhooksModule } from "./webhooks/webhooks.module"
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      validate: validateEnv,
-    }),
-    LoggerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const isProduction =
-          configService.get<string>("NODE_ENV") === "production"
-        const logLevel = configService.get<string>("LOG_LEVEL", "info")
-
-        return {
-          pinoHttp: {
-            level: logLevel,
-            genReqId: (req, res) => {
-              const rawHeader = req.headers["x-request-id"]
-              const existingId = Array.isArray(rawHeader)
-                ? rawHeader[0]
-                : rawHeader
-              const reqId = existingId || randomUUID()
-              res.setHeader("x-request-id", reqId)
-              return reqId
-            },
-            redact: [
-              "req.headers.authorization",
-              "req.headers.cookie",
-              'res.headers["set-cookie"]',
-              "*.password",
-            ],
-            autoLogging: {
-              ignore: (req) => isHealthRoute(req.url),
-            },
-            transport: isProduction
-              ? undefined
-              : {
-                  target: "pino-pretty",
-                  options: {
-                    colorize: true,
-                    singleLine: true,
-                  },
-                },
-          },
-        }
-      },
-    }),
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => [
-        {
-          ttl: configService.get<number>("THROTTLE_TTL_MS", 60000),
-          limit: configService.get<number>("THROTTLE_LIMIT", 100),
-        },
-      ],
-    }),
-    DatabaseModule,
-    HealthModule,
+    CoreModule,
     UsersModule,
-    AuthModule,
-    WebhooksModule,
+    AuthModule.register({
+      imports: [UsersModule],
+      verifier: { provide: TokenVerifier, useClass: ClerkTokenVerifier },
+      resolver: { provide: PrincipalResolver, useClass: UserPrincipalResolver },
+    }),
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    {
-      provide: APP_FILTER,
-      useClass: ProblemDetailsFilter,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: ClerkAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+  providers: [AppService],
 })
 export class AppModule {}
