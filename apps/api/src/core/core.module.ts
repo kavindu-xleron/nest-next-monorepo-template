@@ -8,6 +8,7 @@ import { validateEnv } from "./config/env.schema"
 import { DatabaseModule } from "./database/database.module"
 import { HealthModule } from "./observability/health/health.module"
 import { loggerModuleOptions } from "./observability/logger.config"
+import { WebhooksModule } from "./webhooks/webhooks.module"
 
 /**
  * Everything the application needs regardless of which business domains are
@@ -38,11 +39,12 @@ import { loggerModuleOptions } from "./observability/logger.config"
     }),
     DatabaseModule,
     HealthModule,
+    WebhooksModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
-  exports: [DatabaseModule, HealthModule],
+  exports: [DatabaseModule, HealthModule, WebhooksModule],
 })
 export class CoreModule {}

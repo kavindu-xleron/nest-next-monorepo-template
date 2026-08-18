@@ -1,10 +1,10 @@
-import { Module } from "@nestjs/common"
-// eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
-import { UsersModule } from "@modules/users/users.module"
-import { ClerkWebhookController } from "./clerk-webhook.controller"
+import { Global, Module } from "@nestjs/common"
+import { WebhookVerifier } from "./ports/webhook-verifier"
+import { SvixWebhookVerifier } from "./svix/svix-webhook.verifier"
 
+@Global()
 @Module({
-  imports: [UsersModule],
-  controllers: [ClerkWebhookController],
+  providers: [{ provide: WebhookVerifier, useClass: SvixWebhookVerifier }],
+  exports: [WebhookVerifier],
 })
 export class WebhooksModule {}
