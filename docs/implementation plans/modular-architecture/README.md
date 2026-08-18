@@ -176,6 +176,71 @@ Drizzle in a service, `@nestjs/swagger` in a repository, or anything at all beyo
 | `import type` on a port → runtime DI failure                 | 3, 4  | Boot check each phase; a compile-clean build can still fail here              |
 | Reviewer fatigue from a 60-file rename diff                  | 1     | Phase 1 is moves only — no logic edits in the same commit                     |
 
+## What actually happened
+
+Written after the fact, in the spirit of `REMEDIATION_PLAN.md` — the first pass through the initial
+plan left gaps, and recording them was worth more than a tidy checklist.
+
+**All six phases landed. The structural goal is met:** `grep -rn "@modules" apps/api/src/core`
+returns nothing, and all eight temporary lint suppressions are gone, so the boundary rules hold
+with no exemptions. Test count went 61 → 83 unit and 5 → 7 e2e.
+
+**Two defects were in this plan, not in the implementation.** Both were found only because Phase 0's
+verification forced mechanisms that otherwise pass trivially:
+
+- The e2e Jest alias mapping was specified as `<rootDir>/src/...`. Jest resolves `rootDir` relative
+  to the config file's own directory, so `<rootDir>` is `apps/api/test` and the correct prefix is
+  `<rootDir>/../src/...`.
+- The ESLint `domain/` purity block was placed _before_ the general `src/modules/**` block. Flat
+  config replaces a rule's options rather than merging them, so the later block silently discarded
+  it and domain purity was never enforced. A probe file importing `drizzle-orm` from `domain/`
+  produced no diagnostic at all.
+
+Both fail silently. Neither would have been caught by lint, typecheck, or tests — which is why
+Phase 0 now carries an explicit "probe the two silent failures" step.
+
+**Which risks in the register fired:**
+
+| Risk                                | Fired?                                                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| Aliases break `dist` at runtime     | No — `tsc-alias` worked first time, verified by probe and a live `start:prod` boot |
+| Jest alias mapping wrong            | **Yes** — e2e only, see above                                                      |
+| Boundary rules only warn            | No — `--max-warnings 0` landed with the 3 pre-existing warnings cleared            |
+| Global guard order changes          | **Yes** — see below                                                                |
+| E2E guard spy silently detached     | No — repointed correctly at all four sites                                         |
+| `import type` on a port             | No                                                                                 |
+| Reviewer fatigue on the rename diff | No — Phase 1 stayed moves-only; the "no logic edits" filter came back empty        |
+
+**The guard-ordering risk fired and then resolved itself.** Phase 2 moved `ThrottlerGuard` into
+`CoreModule`, which put it _behind_ the auth guards — 105 unauthenticated requests to a protected
+route returned 105×401 and never a 429, meaning the rate limiter no longer protected the
+JWT-verification path. Phase 4 then moved the auth guards out of `AppModule`'s own providers into
+`AuthModule.register()`, and since `CoreModule` is first in the imports array, throttle-before-auth
+came back for free (97×401 + 8×429). No fix was needed, but the plan had called this "a cost
+preference, not a security property," which under-rated it: an unthrottled auth path is a
+rate-limit bypass on the most expensive route in the app.
+
+**One thing the plan asked for that was quietly better in practice.** Phase 3's "prove the swap" step
+suggested temporarily binding an in-memory fake. Loading the compiled `UsersService` and inspecting
+`require.cache` proves the same thing — zero `pg`, `drizzle-orm`, or `core/database` modules reached
+— without editing a binding. Same for `BearerAuthGuard` and Clerk.
+
+**Estimates that were wrong:** Phase 3 was rated medium risk and Phase 4 high. Phase 4 was in fact
+the smoothest of the two, because Phase 3 had already moved `ensureJitUser` behind a port and added
+`removeByExternalId`. Front-loading the boring work made the risky phase boring too.
+
+**Still outstanding, both minor:**
+
+- `API_KEYS` is read by the stub `ApiKeyTokenVerifier` but not declared in
+  `core/config/env.schema.ts`, so it resolves to `""` and would reject every key if that strategy
+  were bound. One line: `API_KEYS: z.string().optional()`.
+- The webhook email fallback synthesises `<id>@clerk.dev` silently. Phase 5 §4 recommended logging
+  a warning instead, so a misconfigured Clerk instance is diagnosable.
+
+**No generator was built**, deliberately — Phase 6 §5's third option. Writing one against a single
+example bakes in that example's accidents. Revisit at three modules; until then the checklist in the
+root `README.md` is the generator.
+
 ## Out of scope
 
 Deliberately not in this plan: renaming the `clerk_id` column, CQRS or a mediator, event sourcing,

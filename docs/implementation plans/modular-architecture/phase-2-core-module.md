@@ -1,5 +1,7 @@
 # Phase 2 — CoreModule and a legible root
 
+**Status:** ✅ complete (2026-08-18). Global guard order flipped as predicted in §4 — the throttler moved _behind_ the auth guards, briefly leaving the expensive auth path unthrottled. Phase 4 restored it for free by moving the auth guards into `AuthModule`. No action was needed.
+
 **Goal:** collapse `app.module.ts` from 100 lines of interleaved wiring into a composition root you
 can read in one screen.
 **Risk:** low, but it touches global provider registration — read §4 before starting.
@@ -17,7 +19,7 @@ of_, and right now that sentence is buried.
 The pino block is configuration, not wiring. It reads badly inside a module decorator and it is the
 part most likely to be edited by someone who does not otherwise care about `app.module.ts`.
 
-- [ ] `src/core/observability/logger.config.ts`:
+- [x] `src/core/observability/logger.config.ts`:
 
   ```ts
   import { randomUUID } from "node:crypto"
@@ -75,7 +77,7 @@ part most likely to be edited by someone who does not otherwise care about `app.
   }
   ```
 
-- [ ] Copy the body verbatim from `app.module.ts`. Resist tidying it in the same commit — a behaviour
+- [x] Copy the body verbatim from `app.module.ts`. Resist tidying it in the same commit — a behaviour
       change hidden inside an extraction is the hardest kind to spot in review.
 
 Optionally do the same for the throttler factory (`throttler.config.ts`). It is six lines, so inlining
@@ -85,7 +87,7 @@ it in `CoreModule` is defensible; extract only if you expect per-route throttle 
 
 ## 2. Create `CoreModule`
 
-- [ ] `src/core/core.module.ts`:
+- [x] `src/core/core.module.ts`:
 
   ```ts
   import { Module, Global } from "@nestjs/common"
@@ -138,7 +140,7 @@ it in `CoreModule` is defensible; extract only if you expect per-route throttle 
   export class CoreModule {}
   ```
 
-- [ ] Note what did **not** move: `ClerkAuthGuard` and `RolesGuard` stay registered in
+- [x] Note what did **not** move: `ClerkAuthGuard` and `RolesGuard` stay registered in
       `app.module.ts` for now. Moving them is Phase 4's job, and doing it here would mean changing
       guard registration twice.
 
@@ -146,7 +148,7 @@ it in `CoreModule` is defensible; extract only if you expect per-route throttle 
 
 ## 3. Slim `app.module.ts`
 
-- [ ] The whole file becomes:
+- [x] The whole file becomes:
 
   ```ts
   import { Module } from "@nestjs/common"
@@ -197,19 +199,19 @@ initialization order. Two facts follow:
 
 ## 5. Verify
 
-- [ ] `pnpm --filter api test test:e2e` → green. The e2e `x-request-id` assertion is the regression
+- [x] `pnpm --filter api test test:e2e` → green. The e2e `x-request-id` assertion is the regression
       test for the logger extraction; if `genReqId` were dropped or mistyped, that test fails.
-- [ ] `pnpm --filter api dev` → pino-pretty colourised output appears, and hitting
+- [x] `pnpm --filter api dev` → pino-pretty colourised output appears, and hitting
       `/health/live` repeatedly produces **no** access log lines (`autoLogging.ignore` intact).
-- [ ] `NODE_ENV=production pnpm --filter api start:prod` → log lines are raw JSON, not pretty-printed.
-- [ ] `curl -H "x-request-id: abc123" localhost:5001/api/v1/` → response echoes
+- [x] `NODE_ENV=production pnpm --filter api start:prod` → log lines are raw JSON, not pretty-printed.
+- [x] `curl -H "x-request-id: abc123" localhost:5001/api/v1/` → response echoes
       `x-request-id: abc123`; a request without the header gets a generated UUID.
-- [ ] Throttling still engages: exceed `THROTTLE_LIMIT` against `/api/v1/` and get `429`.
-- [ ] Boot with `DRAIN_INTERVAL_MS=40000 SHUTDOWN_TIMEOUT_MS=30000` → the app **refuses to start**
+- [x] Throttling still engages: exceed `THROTTLE_LIMIT` against `/api/v1/` and get `429`.
+- [x] Boot with `DRAIN_INTERVAL_MS=40000 SHUTDOWN_TIMEOUT_MS=30000` → the app **refuses to start**
       with the `superRefine` message from `env.schema.ts`. This confirms `validateEnv` is still wired
       through `CoreModule`; a silently dropped `validate` option would leave the app booting with
       unvalidated config.
-- [ ] `wc -l apps/api/src/app.module.ts` → under 30.
+- [x] `wc -l apps/api/src/app.module.ts` → under 30.
 
 ## Rollback
 

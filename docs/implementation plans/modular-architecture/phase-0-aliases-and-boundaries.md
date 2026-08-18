@@ -1,5 +1,7 @@
 # Phase 0 — Aliases and boundaries
 
+**Status:** ✅ complete (2026-08-18). Two defects in this document were found during verification and fixed: the e2e Jest `rootDir` prefix (§4) and the ESLint block ordering that made the `domain/` zone inert (§5). Both are corrected above.
+
 **Goal:** make the target architecture expressible and enforceable before anything moves.
 **Risk:** low, with one sharp edge — path aliases break the production build unless `tsc-alias` is wired in.
 **Files moved:** none.
@@ -23,7 +25,7 @@ src/database/migrate.ts   9:5  warning  DATABASE_URL is not listed as a dependen
 src/database/seed.ts      8:5  warning  DATABASE_URL is not listed as a dependency in root turbo.json
 ```
 
-- [ ] Root `turbo.json` — add `globalEnv` above `tasks`:
+- [x] Root `turbo.json` — add `globalEnv` above `tasks`:
 
   ```json
   {
@@ -37,13 +39,13 @@ src/database/seed.ts      8:5  warning  DATABASE_URL is not listed as a dependen
   `globalEnv` rather than a per-task `env` because these three files are read by the `db:*` scripts,
   which run outside Turbo's task graph — there is no single task to attach it to.
 
-- [ ] `pnpm --filter api lint` → `0 problems`.
+- [x] `pnpm --filter api lint` → `0 problems`.
 
 ---
 
 ## 2. Path aliases
 
-- [ ] `apps/api/tsconfig.json` — `baseUrl: "./"` already exists, so `paths` is all that is needed:
+- [x] `apps/api/tsconfig.json` — `baseUrl: "./"` already exists, so `paths` is all that is needed:
 
   ```json
   {
@@ -88,13 +90,13 @@ tests pass, and `dist/main.js` contains a literal `require("@core/config/env.sch
 `REMEDIATION_PLAN.md` §2, where `start:prod` pointed at a file the build had silently relocated. The
 failure mode is identical: a fully green pipeline over an unstartable app.
 
-- [ ] Install the rewriter:
+- [x] Install the rewriter:
 
   ```bash
   pnpm --filter api add -D tsc-alias
   ```
 
-- [ ] `apps/api/package.json` — chain it onto the build:
+- [x] `apps/api/package.json` — chain it onto the build:
 
   ```json
   "build": "nest build && tsc-alias -p tsconfig.build.json",
@@ -103,7 +105,7 @@ failure mode is identical: a fully green pipeline over an unstartable app.
   `tsconfig.build.json` extends `tsconfig.json`, so it inherits `paths` and `outDir` with no further
   config.
 
-- [ ] The `db:migrate` / `db:seed` scripts already run through `ts-node -r tsconfig-paths/register`,
+- [x] The `db:migrate` / `db:seed` scripts already run through `ts-node -r tsconfig-paths/register`,
       so they resolve aliases from source with no change.
 
 **Why not the alternatives:** `nest build --webpack` resolves aliases but changes the whole output
@@ -118,7 +120,7 @@ process. `tsc-alias` rewrites the emitted requires at build time and leaves noth
 This is the step most likely to be got wrong, because the two suites have different `rootDir` values
 and therefore need different mappings for the same alias.
 
-- [ ] `apps/api/package.json`, the `jest` block (`rootDir: "src"`):
+- [x] `apps/api/package.json`, the `jest` block (`rootDir: "src"`):
 
   ```json
   "moduleNameMapper": {
@@ -129,7 +131,7 @@ and therefore need different mappings for the same alias.
   }
   ```
 
-- [ ] `apps/api/test/jest-e2e.json` — **note the `../`**:
+- [x] `apps/api/test/jest-e2e.json` — **note the `../`**:
 
   ```json
   "moduleNameMapper": {
@@ -147,7 +149,7 @@ and therefore need different mappings for the same alias.
   than assuming; the unit config's `rootDir: "src"` resolves from the package root because it lives
   in `package.json`, and the inconsistency is easy to miss.
 
-- [ ] Keep the existing `^(\\.{1,2}/.*)\\.js$` mapping first. It strips the `.js` extensions that
+- [x] Keep the existing `^(\\.{1,2}/.*)\\.js$` mapping first. It strips the `.js` extensions that
       `@workspace/contracts` requires (see the comment in `packages/contracts/src/index.ts`) and is
       unrelated to aliases.
 
@@ -162,7 +164,7 @@ These live in `apps/api/eslint.config.mjs`, not in `@workspace/eslint-config`. T
 app's layout, not a general Nest convention, and the shared package is consumed by `web` and `ui`
 too.
 
-- [ ] Replace `apps/api/eslint.config.mjs` in full:
+- [x] Replace `apps/api/eslint.config.mjs` in full:
 
   ```js
   import { nodeNestConfig } from "@workspace/eslint-config/node-nest"
@@ -250,7 +252,7 @@ too.
   ]
   ```
 
-- [ ] `apps/api/package.json` — make warnings fail:
+- [x] `apps/api/package.json` — make warnings fail:
 
   ```json
   "lint": "eslint --max-warnings 0",
@@ -271,7 +273,7 @@ diagnostic.
 Hence the domain block goes last, and restates `CROSS_MODULE_INTERNALS` so that `domain/` files keep
 both protections rather than trading one for the other.
 
-- [ ] Prove it rather than trusting it. Drop a throwaway
+- [x] Prove it rather than trusting it. Drop a throwaway
       `src/modules/probe/domain/probe.ts` importing both `drizzle-orm` and
       `@modules/users/domain/user.entity`, run `pnpm --filter api lint`, and confirm **two** findings
       with **different** messages. Delete the probe. One finding means the ordering has regressed.
@@ -298,14 +300,14 @@ honest in the meantime.
 
 Run in order. The last one is the one that matters.
 
-- [ ] `pnpm --filter api lint` → `0 problems`.
-- [ ] `pnpm --filter api typecheck` → clean.
-- [ ] `pnpm --filter api test` → all suites pass.
-- [ ] `pnpm --filter api test:e2e` → all suites pass.
-- [ ] **`pnpm --filter api build && pnpm --filter api start:prod`** → boots and serves
+- [x] `pnpm --filter api lint` → `0 problems`.
+- [x] `pnpm --filter api typecheck` → clean.
+- [x] `pnpm --filter api test` → all suites pass.
+- [x] `pnpm --filter api test:e2e` → all suites pass.
+- [x] **`pnpm --filter api build && pnpm --filter api start:prod`** → boots and serves
       `curl localhost:5001/health/live`. Nothing uses an alias yet, so this is a baseline; re-run it
       at the end of Phase 1, when the aliases are load-bearing.
-- [ ] `grep -r "@core/\|@modules/\|@shared/" apps/api/dist/` → **no matches** after Phase 1. Any hit
+- [x] `grep -r "@core/\|@modules/\|@shared/" apps/api/dist/` → **no matches** after Phase 1. Any hit
       means `tsc-alias` did not run and the build is broken in production only.
 
 ### Probe the two silent failures before declaring this phase done
@@ -313,14 +315,14 @@ Run in order. The last one is the one that matters.
 Four of the checks above pass trivially while nothing yet uses an alias or violates a boundary. Both
 of the mechanisms they are supposed to guard fail _silently_, so force them once:
 
-- [ ] **Alias rewriting.** Write `src/shared/probe.ts` (`export const PROBE = "ok"`) and a
+- [x] **Alias rewriting.** Write `src/shared/probe.ts` (`export const PROBE = "ok"`) and a
       `src/probe-consumer.ts` importing it via `@shared/probe`. Run `pnpm --filter api build`, then
       `grep require dist/probe-consumer.js` — it must read `./shared/probe`, not `@shared/probe` —
       and `node -e "require('./dist/probe-consumer.js')"` must not throw. Delete both files.
-- [ ] **E2E alias mapping.** Add a one-line `test/probe.e2e-spec.ts` importing `@shared/probe` and
+- [x] **E2E alias mapping.** Add a one-line `test/probe.e2e-spec.ts` importing `@shared/probe` and
       run the e2e suite. Delete it.
-- [ ] **Boundary zones.** The domain-block probe in §5.
-- [ ] Confirm `git status` is clean of probes before committing.
+- [x] **Boundary zones.** The domain-block probe in §5.
+- [x] Confirm `git status` is clean of probes before committing.
 
 ## Rollback
 

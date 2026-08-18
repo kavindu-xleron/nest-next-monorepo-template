@@ -62,13 +62,15 @@ pnpm dev            # both apps
 apps/
   api/                 NestJS API
     src/
-      auth/            Clerk guard, role guard, decorators
-      common/          exception filter, shared HTTP helpers
-      config/          Zod-validated environment
-      database/        Drizzle schema, migrations, seed
-      health/          liveness, readiness, shutdown sequence
-      users/           example domain: controller, service, repository, DTOs
-      webhooks/        Clerk user-sync webhook
+      core/            app-wide infrastructure — no business rules
+        auth/          provider-agnostic guards, ports, Clerk adapter
+        config/        Zod-validated environment
+        database/      Drizzle schema, migrations, seed
+        observability/ logging config, health probes, shutdown sequence
+        webhooks/      signature verification (Svix adapter)
+      modules/         business domains, one folder each
+        users/         domain / application / infrastructure / presentation
+      shared/          framework-adjacent helpers, domain-free
   web/                 Next.js app
     app/               routes (sign-in, sign-up, dashboard)
     lib/               validated env, typed API client
@@ -81,6 +83,107 @@ packages/
 docker/
   compose.dev.yml      Postgres for local development only
 ```
+
+## API architecture
+
+`apps/api/src` is three top-level areas, and dependencies point one way:
+`modules/ → core/ → shared/`, never upward.
+
+`core/` is infrastructure every app needs regardless of what it does — config, database, logging,
+health, auth, webhook verification. `modules/` holds business domains, one folder each. `shared/`
+is domain-free helpers.
+
+Inside a module, four layers:
+
+| Layer             | Holds                                           | Changes when            |
+| ----------------- | ----------------------------------------------- | ----------------------- |
+| `domain/`         | plain entity types, `abstract class` ports      | a business rule changes |
+| `application/`    | use cases, entity → DTO mapping                 | a business rule changes |
+| `infrastructure/` | adapters implementing the ports (Drizzle, SDKs) | the database changes    |
+| `presentation/`   | controllers, DTOs, Swagger                      | the transport changes   |
+
+To place a file, ask what would force it to change. A different database is `infrastructure`; a
+different transport is `presentation`; a different rule is `domain`/`application`. Two answers
+means it needs splitting.
+
+The boundaries are enforced by `no-restricted-imports` zones in `apps/api/eslint.config.mjs`, and
+`pnpm --filter api lint` runs with `--max-warnings 0`, so a violation fails the build rather than
+scrolling past.
+
+Reasoning and the decisions that shaped it: `docs/adr/0001-layered-modules.md`.
+
+### Adding a domain module
+
+1. `modules/<name>/domain/` — entity types and an `abstract class <Name>Repository`.
+2. `core/database/schema/<name>.ts`, re-exported from `schema/index.ts`; then `pnpm db:generate`.
+3. `modules/<name>/infrastructure/drizzle/` — the adapter and a mapper. **The mapper is the only
+   file that should know a column name.**
+4. `modules/<name>/application/` — the service holding use cases.
+5. `modules/<name>/presentation/` — controller and `createZodDto` DTOs wrapping
+   `packages/contracts` schemas.
+6. `<name>.module.ts` — bind the port to the adapter, export the service:
+
+   ```ts
+   providers: [
+     <Name>Service,
+     { provide: <Name>Repository, useClass: Drizzle<Name>Repository },
+   ],
+   exports: [<Name>Service, <Name>Repository],
+   ```
+
+7. `index.ts` — export the module, the service, and entity types. **Nothing else** — other modules
+   reach yours only through this barrel.
+8. Register it in `app.module.ts`.
+
+Ports are **abstract classes, not interfaces**: an interface is erased at compile time and cannot
+be a Nest DI token. For the same reason, never write `import type` on a port — it erases the
+runtime value and DI fails at boot while typecheck stays green.
+
+### Swapping the database
+
+Write an adapter implementing the domain port, then change one line:
+
+```ts
+{ provide: UsersRepository, useClass: MongoUsersRepository }
+```
+
+Nothing in `application/` or `presentation/` changes — `UsersService` has no import from
+`core/database` and pulls in no driver. The domain's `User` is a plain type, not a Drizzle row.
+
+### Swapping the auth provider
+
+`BearerAuthGuard` contains no Clerk imports. It delegates to two ports: `TokenVerifier` (credential
+→ claims) and `PrincipalResolver` (claims → your user). Both are supplied from the composition root
+in `app.module.ts`:
+
+```ts
+AuthModule.register({
+  imports: [UsersModule],
+  verifier: { provide: TokenVerifier, useClass: ClerkTokenVerifier },
+  resolver: { provide: PrincipalResolver, useClass: UserPrincipalResolver },
+})
+```
+
+Moving to Auth0 is a new `TokenVerifier` and a changed binding. Selecting by environment:
+
+```ts
+verifier: {
+  provide: TokenVerifier,
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) =>
+    config.get("AUTH_PROVIDER") === "auth0"
+      ? new Auth0TokenVerifier(config)
+      : new ClerkTokenVerifier(config),
+}
+```
+
+Supporting several credential types at once — session tokens _and_ machine API keys — is
+`CompositeTokenVerifier`, which dispatches on each strategy's `supports()`. The guard still does
+not change. A stub `ApiKeyTokenVerifier` is in `core/auth/strategies/api-key/` as a worked example.
+
+> Any new environment variable must be declared in `core/config/env.schema.ts`. `@nestjs/config`
+> replaces its config object with whatever `validate` returns, and `z.object` strips undeclared
+> keys — so an unlisted variable is invisible to `ConfigService` no matter what is in `.env`.
 
 ## Scripts
 
@@ -140,10 +243,15 @@ hard deadline that force-exits if something hangs.
 Liveness deliberately checks nothing but the process. If it pinged the database, a
 database blip would make Kubernetes restart every healthy pod.
 
-**Auth that fails closed.** The Clerk guard is applied globally with an explicit
-`@Public()` opt-out, so a new route is protected unless it says otherwise. Roles
-come from Clerk; a local `users` row is kept in sync by webhook (Svix-verified) and
-by just-in-time upsert as a fallback, so other tables have something to key on.
+**Auth that fails closed.** A global guard with an explicit `@Public()` opt-out, so a new
+route is protected unless it says otherwise. Roles come from Clerk; a local `users` row is
+kept in sync by webhook (Svix-verified) and by just-in-time upsert as a fallback, so other
+tables have something to key on.
+
+The guard itself is provider-agnostic — it delegates token verification to a swappable
+`TokenVerifier` strategy and user resolution to a `PrincipalResolver` the users module
+implements. Changing identity provider is a new adapter and one binding, not a rewrite. See
+**Swapping the auth provider** above.
 
 **Automated releases.** Conventional Commits are enforced by commitlint on commit,
 and semantic-release turns them into a version, tag, changelog and GitHub release.
@@ -171,14 +279,19 @@ Honest about what is not finished:
   to `main` as part of the release workflow, but nothing runs on a PR.
 - **e2e coverage is thin.** Unit tests mock the database. Meaningful end-to-end
   tests need a Postgres service container.
-- **Clerk session claims need configuring.** Session tokens carry no `email` or
-  `role` by default. Until custom claims are set in the Clerk dashboard, every
-  just-in-time user is created with the default role and a synthesised email.
+- **Clerk session claims must be configured — this is required, not optional.** Session
+  tokens carry no `email` or `role` by default, and authentication now **fails closed**: a
+  token with no `email` claim is rejected with `401` rather than having an address
+  synthesised for it. Add a JWT template in the Clerk dashboard emitting `email` and `role`
+  before anything can sign in. The webhook sync path deliberately keeps a fallback instead,
+  because Clerk retries non-2xx responses and an emailless `user.created` would retry forever.
 - **`packages/contracts` has a conformance test that never runs** — the package has
   no `test` script wired up.
 
 ## Documentation
 
+- `docs/adr/0001-layered-modules.md` — why the API is laid out the way it is, and what would
+  justify reversing each decision
 - `docs/RELEASING.md` — how versioning works and why each setting is what it is
 - `docs/COMMIT_CONVENTIONS.md` — commit format and scopes
 - `docs/LOGGING_AND_ERROR_HANDLING.md` — the error taxonomy and logging strategy

@@ -1,5 +1,7 @@
 # Phase 4 — Auth as a strategy
 
+**Status:** ✅ complete (2026-08-18). `core/` no longer imports `modules/`. Throttle-before-auth was restored as a side effect. **Outstanding:** `API_KEYS` is read by the stub `ApiKeyTokenVerifier` but is not declared in `core/config/env.schema.ts`, so it would resolve to `""` and reject every key if that strategy were ever bound.
+
 **Goal:** make the identity provider swappable, and stop `core/` depending on a business domain.
 **Risk:** high. Global guards, the authentication path, and a test spy that can fail silently.
 **Prerequisite:** Phase 3 merged. **Land this phase alone**, on its own branch, with nothing else in it.
@@ -27,76 +29,80 @@ Request
 
 ### 1.1 `core/auth/ports/token-verifier.ts`
 
-- [ ] ```ts
-      export interface Credential {
-        scheme: string
-        value: string
-      }
-
-      /** Provider-neutral claim set. Whatever the IdP calls these, they arrive here. */
-      export interface AuthClaims {
-        subject: string
-        email: string | null
-        role: string
-        firstName: string | null
-        lastName: string | null
-      }
-
-      export abstract class TokenVerifier {
-        /** Can this strategy handle the credential? Lets several coexist — see §5. */
-        abstract supports(credential: Credential): boolean
-
-        /** Throws UnauthorizedException on anything invalid. Never returns null. */
-        abstract verify(credential: Credential): Promise<AuthClaims>
-
-        /**
-         * Shared claim normalization for JWT-shaped providers. Concrete behaviour,
-         * which is why adapters `extends` this rather than `implements` it.
-         */
-        protected normalize(
-          subject: string,
-          payload: Record<string, unknown>
-        ): AuthClaims {
-          return {
-            subject,
-            email:
-              (payload.email as string) ??
-              (payload.email_address as string) ??
-              null,
-            role: (payload.role as string) ?? "user",
-            firstName: (payload.first_name as string) ?? null,
-            lastName: (payload.last_name as string) ?? null,
+- [x] ````ts
+          export interface Credential {
+            scheme: string
+            value: string
           }
-        }
-      }
-      ```
 
-- [ ] Note what is gone: the old guard's `` `${clerkId}@clerk.dev` `` email fallback. Synthesising a
+          /** Provider-neutral claim set. Whatever the IdP calls these, they arrive here. */
+          export interface AuthClaims {
+            subject: string
+            email: string | null
+            role: string
+            firstName: string | null
+            lastName: string | null
+          }
+
+          export abstract class TokenVerifier {
+            /** Can this strategy handle the credential? Lets several coexist — see §5. */
+            abstract supports(credential: Credential): boolean
+
+            /** Throws UnauthorizedException on anything invalid. Never returns null. */
+            abstract verify(credential: Credential): Promise<AuthClaims>
+
+            /**
+             * Shared claim normalization for JWT-shaped providers. Concrete behaviour,
+             * which is why adapters `extends` this rather than `implements` it.
+             */
+            protected normalize(
+              subject: string,
+              payload: Record<string, unknown>
+            ): AuthClaims {
+              return {
+                subject,
+                email:
+                  (payload.email as string) ??
+                  (payload.email_address as string) ??
+                  null,
+                role: (payload.role as string) ?? "user",
+                firstName: (payload.first_name as string) ?? null,
+                lastName: (payload.last_name as string) ?? null,
+              }
+            }
+          }
+          ```
+
+      ````
+
+- [x] Note what is gone: the old guard's `` `${clerkId}@clerk.dev` `` email fallback. Synthesising a
       fake address to satisfy a NOT NULL column hides a misconfigured Clerk JWT template behind
       plausible-looking data. `email` is nullable in `AuthClaims`; the resolver decides what to do
       about it (§3), and it is the layer that knows the column is NOT NULL.
 
 ### 1.2 `core/auth/ports/principal-resolver.ts`
 
-- [ ] ```ts
-      import { AuthClaims } from "./token-verifier"
+- [x] ````ts
+          import { AuthClaims } from "./token-verifier"
 
-      /** The minimum core needs to know about an authenticated caller. */
-      export interface Principal {
-        id: string
-        email: string
-        role: string
-      }
+          /** The minimum core needs to know about an authenticated caller. */
+          export interface Principal {
+            id: string
+            email: string
+            role: string
+          }
 
-      export abstract class PrincipalResolver {
-        abstract resolve(claims: AuthClaims): Promise<Principal>
-      }
-      ```
+          export abstract class PrincipalResolver {
+            abstract resolve(claims: AuthClaims): Promise<Principal>
+          }
+          ```
 
-- [ ] `UserDto` structurally satisfies `Principal`, so `core/` never learns that a users module
+      ````
+
+- [x] `UserDto` structurally satisfies `Principal`, so `core/` never learns that a users module
       exists. **This is the inversion that removes the boundary violation** — core declares what it
       needs, the domain supplies it.
-- [ ] `implements`, not `extends`, for this one: it is a pure contract with no shared behaviour, so
+- [x] `implements`, not `extends`, for this one: it is a pure contract with no shared behaviour, so
       there is no `super()` to forget.
 
 ---
@@ -105,7 +111,7 @@ Request
 
 ### 2.1 `core/auth/guards/bearer-auth.guard.ts`
 
-- [ ] Replaces `ClerkAuthGuard`. **Zero Clerk imports, zero users imports.** If this file ever needs
+- [x] Replaces `ClerkAuthGuard`. **Zero Clerk imports, zero users imports.** If this file ever needs
       editing again for a provider change, the seam is in the wrong place:
 
   ```ts
@@ -140,16 +146,16 @@ Request
   }
   ```
 
-- [ ] `parseAuthorizationHeader` → `core/auth/authorization-header.ts`, returning
+- [x] `parseAuthorizationHeader` → `core/auth/authorization-header.ts`, returning
       `Credential | null` from `"<scheme> <value>"`. Generalises the old `extractTokenFromHeader`,
       which hardcoded `Bearer`.
-- [ ] **There must be no "skip auth" branch.** `REMEDIATION_PLAN.md` §5 documents a total
+- [x] **There must be no "skip auth" branch.** `REMEDIATION_PLAN.md` §5 documents a total
       authentication bypass caused by exactly that, made worse by `NODE_ENV` defaulting to
       `development`. A missing or unparseable header is a `401`, unconditionally.
 
 ### 2.2 `core/auth/strategies/clerk/clerk-token-verifier.ts`
 
-- [ ] All Clerk knowledge in the request path, in one file:
+- [x] All Clerk knowledge in the request path, in one file:
 
   ```ts
   @Injectable()
@@ -191,20 +197,20 @@ Request
   }
   ```
 
-- [ ] `extends`, and therefore `super()` in the constructor. Forgetting it is a TypeScript error, not
+- [x] `extends`, and therefore `super()` in the constructor. Forgetting it is a TypeScript error, not
       a runtime surprise — but it is the reason `PrincipalResolver` was left as an `implements`-style
       pure contract.
 
 ### 2.3 Files that move unchanged
 
-- [ ] `roles.guard.ts` → `core/auth/guards/` (already there after Phase 1; no edits).
-- [ ] `public.decorator.ts`, `roles.decorator.ts`, `current-user.decorator.ts` → `core/auth/decorators/`.
+- [x] `roles.guard.ts` → `core/auth/guards/` (already there after Phase 1; no edits).
+- [x] `public.decorator.ts`, `roles.decorator.ts`, `current-user.decorator.ts` → `core/auth/decorators/`.
 
 ---
 
 ## 3. The resolver, owned by the users module
 
-- [ ] `modules/users/application/user-principal.resolver.ts`:
+- [x] `modules/users/application/user-principal.resolver.ts`:
 
   ```ts
   @Injectable()
@@ -229,13 +235,13 @@ Request
   }
   ```
 
-- [ ] The JIT provisioning that used to live inside the guard, now owned by the domain that owns the
+- [x] The JIT provisioning that used to live inside the guard, now owned by the domain that owns the
       data. Thanks to Phase 3 §4, a repeat request no longer writes.
-- [ ] The null-email `401` replaces the old `` `${clerkId}@clerk.dev` `` fallback. **This is a
+- [x] The null-email `401` replaces the old `` `${clerkId}@clerk.dev` `` fallback. **This is a
       behaviour change:** a Clerk JWT template that omits `email` used to silently create users with
       fabricated addresses and now fails closed. Verify your template emits `email` before deploying
       — §6 covers it.
-- [ ] Export from `modules/users/index.ts` alongside `UsersModule` and `UsersService`. The composition
+- [x] Export from `modules/users/index.ts` alongside `UsersModule` and `UsersService`. The composition
       root needs to name it.
 
 ---
@@ -244,7 +250,7 @@ Request
 
 ### 4.1 `core/auth/auth.module.ts`
 
-- [ ] A dynamic module that **receives** its adapters instead of importing them. This is what keeps
+- [x] A dynamic module that **receives** its adapters instead of importing them. This is what keeps
       the core→module arrow from existing:
 
   ```ts
@@ -269,44 +275,46 @@ Request
   }
   ```
 
-- [ ] **Guard order in that array is load-bearing.** `RolesGuard` reads `request.user`, which
+- [x] **Guard order in that array is load-bearing.** `RolesGuard` reads `request.user`, which
       `BearerAuthGuard` sets. Same module, that order, so their relative sequence does not depend on
       module resolution. Registering an `APP_GUARD` from a non-root module works and lets the guard
       inject that module's providers — that is what makes this possible at all.
 
 ### 4.2 `app.module.ts` becomes the composition root
 
-- [ ] ```ts
-      @Module({
-        imports: [
-          CoreModule,
-          UsersModule,
-          AuthModule.register({
-            imports: [UsersModule],
-            verifier: { provide: TokenVerifier, useClass: ClerkTokenVerifier },
-            resolver: {
-              provide: PrincipalResolver,
-              useClass: UserPrincipalResolver,
-            },
-          }),
-          WebhooksModule, // removed in Phase 5
-        ],
-        controllers: [AppController],
-        providers: [AppService],
-      })
-      export class AppModule {}
-      ```
+- [x] ````ts
+          @Module({
+            imports: [
+              CoreModule,
+              UsersModule,
+              AuthModule.register({
+                imports: [UsersModule],
+                verifier: { provide: TokenVerifier, useClass: ClerkTokenVerifier },
+                resolver: {
+                  provide: PrincipalResolver,
+                  useClass: UserPrincipalResolver,
+                },
+              }),
+              WebhooksModule, // removed in Phase 5
+            ],
+            controllers: [AppController],
+            providers: [AppService],
+          })
+          export class AppModule {}
+          ```
 
-- [ ] `UsersModule` already exports `UsersService`, so Nest can construct `UserPrincipalResolver`
+      ````
+
+- [x] `UsersModule` already exports `UsersService`, so Nest can construct `UserPrincipalResolver`
       inside `AuthModule`'s injector. The two `APP_GUARD` entries disappear from `AppModule` — they
       now live in `AuthModule.register()`.
 
 ### 4.3 Remove the Phase 1 debt
 
-- [ ] Delete the three `-- removed in Phase 4` suppressions:
+- [x] Delete the three `-- removed in Phase 4` suppressions:
       `core/auth/auth.module.ts`, `core/auth/guards/clerk-auth.guard.ts`,
       `core/auth/guards/clerk-auth.guard.spec.ts` — the latter two by deleting the files.
-- [ ] `grep -rn "removed in Phase 4" apps/api/src` → no matches.
+- [x] `grep -rn "removed in Phase 4" apps/api/src` → no matches.
 
 ---
 
@@ -314,10 +322,10 @@ Request
 
 A swappable seam nobody has swapped is a claim, not a fact. Commit at least the stub.
 
-- [ ] `core/auth/strategies/api-key/api-key-verifier.ts` — `supports()` returns true for scheme
+- [x] `core/auth/strategies/api-key/api-key-verifier.ts` — `supports()` returns true for scheme
       `ApiKey`; `verify()` hashes the value and looks it up. A stub that reads a comma-separated
       `API_KEYS` env var is enough to demonstrate the extension point.
-- [ ] `core/auth/strategies/composite-token-verifier.ts`:
+- [x] `core/auth/strategies/composite-token-verifier.ts`:
 
   ```ts
   export class CompositeTokenVerifier extends TokenVerifier {
@@ -343,7 +351,7 @@ A swappable seam nobody has swapped is a claim, not a fact. Commit at least the 
 
   Bind it as `TokenVerifier` when more than one strategy is live. **The guard does not change.**
 
-- [ ] Document the env-driven single-provider form in the README, since that is what a template
+- [x] Document the env-driven single-provider form in the README, since that is what a template
       consumer reaches for first:
 
   ```ts
@@ -368,18 +376,18 @@ A swappable seam nobody has swapped is a claim, not a fact. Commit at least the 
 
 ### 6.1 Unit
 
-- [ ] `bearer-auth.guard.spec.ts` — port the existing `clerk-auth.guard.spec.ts` structure (mock
+- [x] `bearer-auth.guard.spec.ts` — port the existing `clerk-auth.guard.spec.ts` structure (mock
       `Reflector`, direct construction, fake `ExecutionContext`), replacing the `ConfigService` and
       `UsersService` mocks with mock `TokenVerifier` and `PrincipalResolver`. Cases: `@Public()`
       short-circuits before touching the verifier; missing header → `401`; malformed header → `401`;
       verifier throws → propagates; success → `request.user` is the resolver's return value.
-- [ ] `clerk-token-verifier.spec.ts` — the Clerk-specific assertions from the old spec: missing
+- [x] `clerk-token-verifier.spec.ts` — the Clerk-specific assertions from the old spec: missing
       `CLERK_SECRET_KEY` → `401`; `verifyToken` rejection wrapped as `401`;
       `CLERK_AUTHORIZED_PARTIES` split and trimmed; claims normalized.
-- [ ] `user-principal.resolver.spec.ts` — delegates to `ensureJitUser` with mapped fields; null email
+- [x] `user-principal.resolver.spec.ts` — delegates to `ensureJitUser` with mapped fields; null email
       → `401`.
-- [ ] `composite-token-verifier.spec.ts` — dispatch by scheme; unknown scheme → `401`.
-- [ ] Delete `clerk-auth.guard.ts` and `clerk-auth.guard.spec.ts` only once the above are green.
+- [x] `composite-token-verifier.spec.ts` — dispatch by scheme; unknown scheme → `401`.
+- [x] Delete `clerk-auth.guard.ts` and `clerk-auth.guard.spec.ts` only once the above are green.
 
 ### 6.2 E2E — the failure mode to watch
 
@@ -389,14 +397,14 @@ A swappable seam nobody has swapped is a claim, not a fact. Commit at least the 
 jest.spyOn(ClerkAuthGuard.prototype, "canActivate").mockImplementation(...)
 ```
 
-- [ ] Repoint it at `BearerAuthGuard.prototype.canActivate`.
+- [x] Repoint it at `BearerAuthGuard.prototype.canActivate`.
 
 **If you miss this, nothing tells you.** The spy still attaches to a real class, TypeScript is happy,
 and the suite runs — but the guard actually registered as `APP_GUARD` is unmocked, so every
 authenticated test hits the real Clerk verifier and fails on a missing secret key. The failure
 message points at Clerk configuration, not at the spy. Budget for it.
 
-- [ ] Add these e2e cases, which are also the ordering proof:
+- [x] Add these e2e cases, which are also the ordering proof:
   - No `Authorization` header on a protected route → **401**. (Standing regression test for
     `REMEDIATION_PLAN.md` §5.)
   - Authenticated as `role: "user"` against a `@Roles("admin")` route → **403**. A `403` rather than a
@@ -409,17 +417,17 @@ message points at Clerk configuration, not at the spy. Budget for it.
 
 ## 7. Verify
 
-- [ ] `pnpm --filter api lint typecheck test test:e2e` → green.
-- [ ] `grep -rn "@clerk/backend" apps/api/src` → matches **only** in
+- [x] `pnpm --filter api lint typecheck test test:e2e` → green.
+- [x] `grep -rn "@clerk/backend" apps/api/src` → matches **only** in
       `core/auth/strategies/clerk/`. Anywhere else means provider knowledge leaked.
-- [ ] `grep -rn "@modules" apps/api/src/core` → **no matches**. The core→modules dependency is gone;
+- [x] `grep -rn "@modules" apps/api/src/core` → **no matches**. The core→modules dependency is gone;
       this is the phase's structural deliverable.
-- [ ] Boot against dev Postgres with a real Clerk token: `/api/v1/users/me` returns the profile.
-- [ ] Same token twice with Postgres statement logging on → the second request issues **no**
+- [x] Boot against dev Postgres with a real Clerk token: `/api/v1/users/me` returns the profile.
+- [x] Same token twice with Postgres statement logging on → the second request issues **no**
       `UPDATE users` (Phase 3 §4 observed end to end through the new path).
-- [ ] Confirm your Clerk JWT template emits `email`. With §3's fail-closed behaviour, a template
+- [x] Confirm your Clerk JWT template emits `email`. With §3's fail-closed behaviour, a template
       missing it now returns `401` where it previously invented `<clerkId>@clerk.dev`.
-- [ ] Flip `verifier` to a hand-written stub returning fixed claims, boot with no Clerk keys set, and
+- [x] Flip `verifier` to a hand-written stub returning fixed claims, boot with no Clerk keys set, and
       confirm a request authenticates. That is the swap, demonstrated. Revert.
 
 ## Rollback

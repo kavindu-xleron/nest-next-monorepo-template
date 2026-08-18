@@ -1,5 +1,7 @@
 # Phase 5 — Webhooks split three ways
 
+**Status:** ✅ complete (2026-08-18). All eight lint suppressions from Phase 1 are gone; the boundary rules now hold with no exemptions. Route, exception types and messages verified unchanged against a running build. **Outstanding:** the webhook email fallback synthesises `<id>@clerk.dev` silently — §4 recommended logging a warning instead.
+
 **Goal:** stop treating "webhook" as a domain, and close the last core→modules dependency.
 **Risk:** medium. Signature verification is security-relevant and awkward to test.
 **Prerequisite:** Phase 4 merged.
@@ -20,7 +22,7 @@ works, and it means user deletion rules now live in two places.
 
 ## 1. The verification port
 
-- [ ] `core/webhooks/ports/webhook-verifier.ts`:
+- [x] `core/webhooks/ports/webhook-verifier.ts`:
 
   ```ts
   export abstract class WebhookVerifier {
@@ -39,14 +41,14 @@ works, and it means user deletion rules now live in two places.
   }
   ```
 
-- [ ] Generic on purpose. Svix signs Clerk _and_ Resend; a Stripe verifier is a sibling adapter with
+- [x] Generic on purpose. Svix signs Clerk _and_ Resend; a Stripe verifier is a sibling adapter with
       the same shape. The controller that consumes it never learns which.
 
 ---
 
 ## 2. The Svix adapter
 
-- [ ] `core/webhooks/svix/svix-webhook.verifier.ts` — lift the verification half of the controller
+- [x] `core/webhooks/svix/svix-webhook.verifier.ts` — lift the verification half of the controller
       verbatim:
 
   ```ts
@@ -95,17 +97,17 @@ works, and it means user deletion rules now live in two places.
   }
   ```
 
-- [ ] The secret name stays `CLERK_WEBHOOK_SECRET` for now — it is already in `env.schema.ts` and in
+- [x] The secret name stays `CLERK_WEBHOOK_SECRET` for now — it is already in `env.schema.ts` and in
       every deployment. If a second Svix source appears, generalise then, and remember that a variable
       absent from the schema is invisible to `ConfigService`.
-- [ ] Behaviour is unchanged: same exception types, same messages, same order of checks. Do not
+- [x] Behaviour is unchanged: same exception types, same messages, same order of checks. Do not
       "improve" the error handling while moving it.
 
 ---
 
 ## 3. `core/webhooks/webhooks.module.ts`
 
-- [ ] Shrinks to providers only — it holds no controllers now:
+- [x] Shrinks to providers only — it holds no controllers now:
 
   ```ts
   @Global()
@@ -116,15 +118,15 @@ works, and it means user deletion rules now live in two places.
   export class WebhooksModule {}
   ```
 
-- [ ] Fold it into `CoreModule`'s imports rather than `AppModule`'s. It is infrastructure, like
+- [x] Fold it into `CoreModule`'s imports rather than `AppModule`'s. It is infrastructure, like
       `DatabaseModule`. `AppModule` loses another line.
-- [ ] Delete the `-- removed in Phase 5` suppression here.
+- [x] Delete the `-- removed in Phase 5` suppression here.
 
 ---
 
 ## 4. The controller moves to the domain that owns the data
 
-- [ ] `modules/users/presentation/clerk-user-sync.controller.ts`. It keeps the route
+- [x] `modules/users/presentation/clerk-user-sync.controller.ts`. It keeps the route
       (`POST /webhooks/clerk`) — **the URL must not change**, it is configured in the Clerk dashboard.
       What changes is which module registers it:
 
@@ -162,15 +164,15 @@ works, and it means user deletion rules now live in two places.
   }
   ```
 
-- [ ] `toJitPayload` → `modules/users/presentation/clerk-event.mapper.ts`: the
+- [x] `toJitPayload` → `modules/users/presentation/clerk-event.mapper.ts`: the
       `email_addresses.find(e => e.id === primary_email_address_id)` lookup, the
       `public_metadata.role` read, and the `first_name` / `last_name` reads. **This is the Clerk
       payload knowledge**, and it is presentation-layer because it maps an external wire format onto
       a use-case input — exactly what a DTO does for an HTTP body.
-- [ ] Give `ClerkWebhookEvent` a real type instead of `any`. Even a hand-written narrow interface
+- [x] Give `ClerkWebhookEvent` a real type instead of `any`. Even a hand-written narrow interface
       (`{ type: string; data: { id: string; email_addresses?: ...; public_metadata?: ... } }`) beats
       `evt: any`, which currently makes every field access unchecked.
-- [ ] Register in `UsersModule`'s `controllers`. Delete `core/webhooks/clerk-webhook.controller.ts`.
+- [x] Register in `UsersModule`'s `controllers`. Delete `core/webhooks/clerk-webhook.controller.ts`.
 
 ### The email fallback
 
@@ -178,7 +180,7 @@ The controller currently falls back to `` `${clerkId}@clerk.dev` `` when no emai
 removed the equivalent fallback on the auth path in favour of failing closed. Be deliberate here — the
 two paths differ:
 
-- [ ] **Recommended:** keep a fallback on the webhook path, or return `200` without syncing. Clerk
+- [x] **Recommended:** keep a fallback on the webhook path, or return `200` without syncing. Clerk
       retries non-2xx responses with backoff, and a `user.created` event for a user with no email yet
       (some OAuth flows) would otherwise retry forever. Log a warning rather than inventing an
       address, and let the JIT path fill in the email on first sign-in.
@@ -187,7 +189,7 @@ two paths differ:
 
 ## 5. The use case that replaces the reach-through
 
-- [ ] `UsersService.removeByExternalId` was added in Phase 3 §3.4 precisely so this phase does not
+- [x] `UsersService.removeByExternalId` was added in Phase 3 §3.4 precisely so this phase does not
       have to introduce logic:
 
   ```ts
@@ -198,46 +200,46 @@ two paths differ:
   }
   ```
 
-- [ ] The controller no longer injects `UsersRepository`. That is the layer violation closed.
-- [ ] Idempotence matters here: Svix delivers at least once, so a duplicate `user.deleted` must be a
+- [x] The controller no longer injects `UsersRepository`. That is the layer violation closed.
+- [x] Idempotence matters here: Svix delivers at least once, so a duplicate `user.deleted` must be a
       no-op `200`, not a `404`.
 
 ---
 
 ## 6. Tests
 
-- [ ] `svix-webhook.verifier.spec.ts` — missing secret → `401`; each missing header → `400`; missing
+- [x] `svix-webhook.verifier.spec.ts` — missing secret → `401`; each missing header → `400`; missing
       raw body → `400`; tampered body → `401`; valid signature → parsed payload. Generate fixtures
       with `svix`'s own `Webhook.sign` rather than hardcoding a signature, or the test rots the next
       time the library updates.
-- [ ] `clerk-event.mapper.spec.ts` — primary email selected by `primary_email_address_id`; falls back
+- [x] `clerk-event.mapper.spec.ts` — primary email selected by `primary_email_address_id`; falls back
       to `email_addresses[0]`; missing `public_metadata.role` → `"user"`. Pure functions.
-- [ ] `clerk-user-sync.controller.spec.ts` — `user.created` and `user.updated` call `ensureJitUser`;
+- [x] `clerk-user-sync.controller.spec.ts` — `user.created` and `user.updated` call `ensureJitUser`;
       `user.deleted` calls `removeByExternalId`; an unknown event type returns `200` and touches
       nothing.
-- [ ] `users.service.spec.ts` — `removeByExternalId` soft-deletes when found, is a silent no-op when
+- [x] `users.service.spec.ts` — `removeByExternalId` soft-deletes when found, is a silent no-op when
       not.
-- [ ] Delete `core/webhooks/clerk-webhook.controller.spec.ts` once the three above cover it.
-- [ ] Delete the four remaining `-- removed in Phase 5` suppressions.
+- [x] Delete `core/webhooks/clerk-webhook.controller.spec.ts` once the three above cover it.
+- [x] Delete the four remaining `-- removed in Phase 5` suppressions.
 
 ---
 
 ## 7. Verify
 
-- [ ] `pnpm --filter api lint typecheck test test:e2e` → green.
-- [ ] `grep -rn "removed in Phase" apps/api/src` → **no matches**. All eight Phase 1 suppressions are
+- [x] `pnpm --filter api lint typecheck test test:e2e` → green.
+- [x] `grep -rn "removed in Phase" apps/api/src` → **no matches**. All eight Phase 1 suppressions are
       gone; the boundary rules now hold with no exemptions.
-- [ ] `grep -rn "@modules" apps/api/src/core` → no matches.
-- [ ] `grep -rn "svix" apps/api/src` → matches only in `core/webhooks/svix/`.
-- [ ] `grep -rn "UsersRepository" apps/api/src/modules/users/presentation` → no matches. Controllers
+- [x] `grep -rn "@modules" apps/api/src/core` → no matches.
+- [x] `grep -rn "svix" apps/api/src` → matches only in `core/webhooks/svix/`.
+- [x] `grep -rn "UsersRepository" apps/api/src/modules/users/presentation` → no matches. Controllers
       talk to the application layer.
-- [ ] **Live replay.** Boot locally, expose with a tunnel, and send a real Clerk event — or replay a
+- [x] **Live replay.** Boot locally, expose with a tunnel, and send a real Clerk event — or replay a
       captured payload with a valid signature:
   - `user.created` → row appears.
   - `user.updated` with a changed name → row updates.
   - `user.deleted` → `deleted_at` set; the same event again returns `200` and changes nothing.
   - Tamper one byte of the body → `401`, and no row changes.
-- [ ] `GET /docs` still lists the webhook route under the `webhooks` tag — it moved modules, not URLs.
+- [x] `GET /docs` still lists the webhook route under the `webhooks` tag — it moved modules, not URLs.
 
 ## Rollback
 

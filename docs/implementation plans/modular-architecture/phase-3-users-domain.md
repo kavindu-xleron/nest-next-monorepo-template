@@ -1,5 +1,7 @@
 # Phase 3 — The users domain: port and adapter
 
+**Status:** ✅ complete (2026-08-18). `ensureJitUser`'s payload field was renamed `clerkId` → `externalId` during review (§3.3) — it was the last provider vocabulary left in `application/`. The §8 grep was also over-strict and is now scoped to `domain/` + `application/`.
+
 **Goal:** make the data source swappable, and establish the layer shape every future module copies.
 **Risk:** medium. Real logic changes, including one performance fix.
 **Prerequisite:** Phase 2 merged.
@@ -43,7 +45,7 @@ in `presentation/` during Phase 5.
 
 ### 1.1 `shared/types/page.ts`
 
-- [ ] Cursor pagination is not users-specific, and the domain must not import an API contract:
+- [x] Cursor pagination is not users-specific, and the domain must not import an API contract:
 
   ```ts
   /**
@@ -61,7 +63,7 @@ in `presentation/` during Phase 5.
 
 ### 1.2 `domain/user.entity.ts`
 
-- [ ] Plain types only. This file must import nothing but `@shared` types:
+- [x] Plain types only. This file must import nothing but `@shared` types:
 
   ```ts
   export type UserRole = "user" | "admin"
@@ -103,7 +105,7 @@ in `presentation/` during Phase 5.
 
 ### 1.3 `domain/users.repository.ts`
 
-- [ ] The port. An `abstract class`, not an interface — it compiles to a real JS class, so it doubles
+- [x] The port. An `abstract class`, not an interface — it compiles to a real JS class, so it doubles
       as the DI token and the call sites stay `@Inject`-free:
 
   ```ts
@@ -146,7 +148,7 @@ in `presentation/` during Phase 5.
 
 ### 2.1 `infrastructure/drizzle/user.mapper.ts`
 
-- [ ] The only file in the application that knows the column is called `clerk_id`:
+- [x] The only file in the application that knows the column is called `clerk_id`:
 
   ```ts
   import {
@@ -195,12 +197,12 @@ in `presentation/` during Phase 5.
   }
   ```
 
-- [ ] `toPatch(data: UserPatch)` follows the same shape — spread only the keys that are present, so a
+- [x] `toPatch(data: UserPatch)` follows the same shape — spread only the keys that are present, so a
       partial update never nulls a field it did not mention.
 
 ### 2.2 `infrastructure/drizzle/drizzle-users.repository.ts`
 
-- [ ] Today's `users.repository.ts` body, with three changes: `implements UsersRepository`, every
+- [x] Today's `users.repository.ts` body, with three changes: `implements UsersRepository`, every
       return threaded through `toEntity`, and `?? null` on the lookups.
 
   ```ts
@@ -222,12 +224,12 @@ in `presentation/` during Phase 5.
   }
   ```
 
-- [ ] `findPaginated` → `findPage`, returning `Page<User>`. The `limit + 1` over-fetch and
+- [x] `findPaginated` → `findPage`, returning `Page<User>`. The `limit + 1` over-fetch and
       `lt(users.id, cursor)` keyset logic is correct — carry it over unchanged.
-- [ ] `create` keeps the "insert returned no row" guard. That is a genuine invariant check, not
+- [x] `create` keeps the "insert returned no row" guard. That is a genuine invariant check, not
       defensive noise.
-- [ ] `softDelete` returns `Promise<void>` now. The old return value was never used.
-- [ ] `implements`, not `extends`: `UsersRepository` is a pure contract with no shared behaviour, so
+- [x] `softDelete` returns `Promise<void>` now. The old return value was never used.
+- [x] `implements`, not `extends`: `UsersRepository` is a pure contract with no shared behaviour, so
       `implements` avoids a pointless `super()` call. (`TokenVerifier` in Phase 4 goes the other way,
       and explains why.)
 
@@ -237,26 +239,26 @@ in `presentation/` during Phase 5.
 
 ### 3.1 Move and re-point
 
-- [ ] `git mv users.service.ts application/users.service.ts` (and its spec).
-- [ ] Delete `import { User } from "@core/database/schema/users"`; import the domain entity instead.
-- [ ] The constructor is **unchanged** — `constructor(private readonly usersRepository: UsersRepository)`
+- [x] `git mv users.service.ts application/users.service.ts` (and its spec).
+- [x] Delete `import { User } from "@core/database/schema/users"`; import the domain entity instead.
+- [x] The constructor is **unchanged** — `constructor(private readonly usersRepository: UsersRepository)`
       now injects the port, resolved through `emitDecoratorMetadata` against the `provide:` binding in
       §5. No `@Inject`, no string token.
 
 ### 3.2 Fold the cast away
 
-- [ ] `toUserDto` currently contains `role: user.role as "user" | "admin"`. With `normalizeRole` in
+- [x] `toUserDto` currently contains `role: user.role as "user" | "admin"`. With `normalizeRole` in
       the mapper, `user.role` is already `UserRole` and the cast deletes itself. Confirm the assertion
       is gone rather than merely unnecessary.
 
 ### 3.3 Rename call sites
 
-- [ ] `usersRepository.findByClerkId(...)` → `findByExternalId(...)`
-- [ ] `usersRepository.findPaginated(cursor, limit)` → `findPage(cursor, limit)`
-- [ ] `create({ clerkId: ... })` → `create({ externalId: ... })`. Note `create()` in `UsersService`
+- [x] `usersRepository.findByClerkId(...)` → `findByExternalId(...)`
+- [x] `usersRepository.findPaginated(cursor, limit)` → `findPage(cursor, limit)`
+- [x] `create({ clerkId: ... })` → `create({ externalId: ... })`. Note `create()` in `UsersService`
       currently synthesises `clerk_dev_${Date.now()}_${random}` for admin-created users; keep that
       behaviour but name the field `externalId`.
-- [ ] **`ensureJitUser`'s payload parameter too** — rename its `clerkId` field to `externalId`, not
+- [x] **`ensureJitUser`'s payload parameter too** — rename its `clerkId` field to `externalId`, not
       just the repository calls it makes. It is easy to miss because the method compiles fine either
       way: the value gets renamed on the first line of the body and everything downstream is already
       correct. But the parameter is the module's public surface, and leaving it means the one piece
@@ -270,7 +272,7 @@ in `presentation/` during Phase 5.
 
 ### 3.4 New use case for Phase 5
 
-- [ ] Add `removeByExternalId(externalId: string): Promise<void>` — find, and soft-delete if present.
+- [x] Add `removeByExternalId(externalId: string): Promise<void>` — find, and soft-delete if present.
       Phase 5 needs it to stop the webhook controller reaching into the repository directly. Adding it
       here keeps that phase to a pure move.
 
@@ -290,7 +292,7 @@ method via `PrincipalResolver`. Carrying the bug forward would make the new seam
 
 ### 4.2 The fix
 
-- [ ] In `ensureJitUser`, compare before writing:
+- [x] In `ensureJitUser`, compare before writing:
 
   ```ts
   const existing = await this.usersRepository.findByExternalId(
@@ -311,7 +313,7 @@ method via `PrincipalResolver`. Carrying the bug forward would make the new seam
   }
   ```
 
-- [ ] Leave the email-collision branch (`findByEmail` → adopt the row, set `externalId`) intact. That
+- [x] Leave the email-collision branch (`findByEmail` → adopt the row, set `externalId`) intact. That
       path is the webhook/JIT reconciliation described in `INITIAL_IMPLEMENTATION_PLAN.md` and is
       genuinely a write.
 
@@ -319,7 +321,7 @@ method via `PrincipalResolver`. Carrying the bug forward would make the new seam
 
 ## 5. Module and barrel
 
-- [ ] `users.module.ts`:
+- [x] `users.module.ts`:
 
   ```ts
   @Module({
@@ -336,7 +338,7 @@ method via `PrincipalResolver`. Carrying the bug forward would make the new seam
   `UsersRepository` is exported because Phase 5's webhook path and any future module-level
   composition bind against the token, not the adapter. It is **not** re-exported from `index.ts`.
 
-- [ ] `modules/users/index.ts` — the module's public API:
+- [x] `modules/users/index.ts` — the module's public API:
 
   ```ts
   export { UsersModule } from "./users.module"
@@ -351,12 +353,12 @@ method via `PrincipalResolver`. Carrying the bug forward would make the new seam
 
 ## 6. Presentation
 
-- [ ] `git mv users.controller.ts presentation/` and `git mv dto presentation/dto`.
-- [ ] The DTO classes are unchanged — they already wrap `@workspace/contracts` schemas via
+- [x] `git mv users.controller.ts presentation/` and `git mv dto presentation/dto`.
+- [x] The DTO classes are unchanged — they already wrap `@workspace/contracts` schemas via
       `createZodDto`, which is exactly the right shape: contracts stay framework-free for the web app,
       the API binds them at its edge.
-- [ ] The controller's `@CurrentUser()` and `@Roles()` imports keep their `@core/auth/...` paths.
-- [ ] `findMe(user?.id)` and the self-or-admin check in `findOne` stay as they are. They are
+- [x] The controller's `@CurrentUser()` and `@Roles()` imports keep their `@core/auth/...` paths.
+- [x] `findMe(user?.id)` and the self-or-admin check in `findOne` stay as they are. They are
       authorization decisions expressed at the transport edge, which is where they belong.
 
 ---
@@ -367,27 +369,27 @@ The existing specs construct classes directly (`new UsersService(repository)`) w
 objects rather than `Test.createTestingModule`, so this phase is cheap for them. That is luck worth
 preserving — keep the direct-construction style.
 
-- [ ] `users.service.spec.ts`:
+- [x] `users.service.spec.ts`:
   - `findByClerkId` → `findByExternalId`, `findPaginated` → `findPage` in the mock object.
   - `mockUserRow` becomes a `User` **entity**: drop `clerkId` and `deletedAt`, add `externalId`.
     Rename it `mockUser` — it is no longer a row.
   - Every `mockResolvedValue(undefined)` → `mockResolvedValue(null)`.
   - The assertion that `toUserDto` "strips internal clerkId and deletedAt" still passes, and now for a
     stronger reason: those fields never reach the service at all.
-- [ ] **New:** `ensureJitUser` calls `repository.update` when a claim drifted, and does **not** call it
+- [x] **New:** `ensureJitUser` calls `repository.update` when a claim drifted, and does **not** call it
       when nothing changed. This is the regression test for §4 — without it the write-per-request bug
       silently returns the first time someone refactors the comparison.
-- [ ] **New:** `user.mapper.spec.ts` — `toEntity` maps `clerkId` → `externalId`; `normalizeRole`
+- [x] **New:** `user.mapper.spec.ts` — `toEntity` maps `clerkId` → `externalId`; `normalizeRole`
       returns `"user"` for `"superadmin"`, `""`, and `"ADMIN"`. Pure functions, no DB, no Nest.
-- [ ] `users.controller.spec.ts` — import path only.
+- [x] `users.controller.spec.ts` — import path only.
 
 ---
 
 ## 8. Verify
 
-- [ ] `pnpm --filter api lint typecheck test test:e2e` → green.
-- [ ] `grep -rn "import type.*Repository" apps/api/src` → no matches. See the warning in §1.3.
-- [ ] `grep -rn "clerkId" apps/api/src/modules/users/domain apps/api/src/modules/users/application`
+- [x] `pnpm --filter api lint typecheck test test:e2e` → green.
+- [x] `grep -rn "import type.*Repository" apps/api/src` → no matches. See the warning in §1.3.
+- [x] `grep -rn "clerkId" apps/api/src/modules/users/domain apps/api/src/modules/users/application`
       → no matches. Provider naming must not survive above the infrastructure boundary.
 
       Scoped to those two directories deliberately. `clerkId` **is** expected under
@@ -395,8 +397,8 @@ preserving — keep the direct-construction style.
       to query it (`eq(users.clerkId, externalId)`). A repo-wide `grep` over `src/modules` produces
       false positives on correct code and trains you to ignore it.
 
-- [ ] `grep -rn "as \"user\" | \"admin\"" apps/api/src` → no matches.
-- [ ] **Prove the swap.** Temporarily bind an in-memory fake in `users.module.ts`:
+- [x] `grep -rn "as \"user\" | \"admin\"" apps/api/src` → no matches.
+- [x] **Prove the swap.** Temporarily bind an in-memory fake in `users.module.ts`:
 
   ```ts
   { provide: UsersRepository, useValue: new InMemoryUsersRepository() }
@@ -407,7 +409,7 @@ preserving — keep the direct-construction style.
   binding afterwards, but consider keeping the fake under `infrastructure/in-memory/` — it makes
   e2e tests DB-free later.
 
-- [ ] **Prove the write fix.** Boot against dev Postgres with statement logging on
+- [x] **Prove the write fix.** Boot against dev Postgres with statement logging on
       (`ALTER SYSTEM SET log_statement = 'all'`), issue the same authenticated request twice, and
       confirm the second produces **no** `UPDATE users`. Before this phase it produced one every time.
 

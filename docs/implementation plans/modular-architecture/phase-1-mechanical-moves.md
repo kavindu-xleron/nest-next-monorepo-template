@@ -1,5 +1,7 @@
 # Phase 1 — Mechanical moves
 
+**Status:** ✅ complete (2026-08-18). No defects. All 21 import rewrites correct, exactly eight suppressions landed, `tsc-alias` proven under load-bearing aliases.
+
 **Goal:** get every file to its final top-level home. Nothing else.
 **Risk:** low. High diff volume, near-zero semantic change.
 **Prerequisite:** Phase 0 merged.
@@ -16,7 +18,7 @@ Internal layer folders (`domain/`, `application/`, …) are **not** created here
 
 ## 1. Move the directories
 
-- [ ] Run as one batch, then commit before touching imports — a commit containing only renames lets
+- [x] Run as one batch, then commit before touching imports — a commit containing only renames lets
       reviewers use `git log --follow`:
 
   ```bash
@@ -203,21 +205,21 @@ all *.spec.ts subject imports                 ./<subject>
 
 ## 3. Config path updates
 
-- [ ] `apps/api/drizzle.config.ts`:
+- [x] `apps/api/drizzle.config.ts`:
 
   ```ts
   schema: "./src/core/database/schema/index.ts",
   out: "./src/core/database/migrations",
   ```
 
-- [ ] `apps/api/package.json`:
+- [x] `apps/api/package.json`:
 
   ```json
   "db:migrate": "ts-node -r tsconfig-paths/register src/core/database/migrate.ts",
   "db:seed":    "ts-node -r tsconfig-paths/register src/core/database/seed.ts"
   ```
 
-- [ ] Root `package.json` `db:generate` / `db:migrate` / `db:seed` delegate via
+- [x] Root `package.json` `db:generate` / `db:migrate` / `db:seed` delegate via
       `pnpm --filter api ...`, so they need no change. Confirm rather than assume.
 
 ---
@@ -242,19 +244,19 @@ legal after Phase 3, because tables are not moving out of `core/database/schema/
 
 ## 5. Verify
 
-- [ ] `pnpm --filter api lint` → `0 problems`. Any core→modules complaint means a suppression comment
+- [x] `pnpm --filter api lint` → `0 problems`. Any core→modules complaint means a suppression comment
       is missing; add it with its phase number, do not weaken the rule.
-- [ ] `pnpm --filter api typecheck` → clean.
-- [ ] `pnpm --filter api test` → same test count as before the phase. A drop means a spec file was
+- [x] `pnpm --filter api typecheck` → clean.
+- [x] `pnpm --filter api test` → same test count as before the phase. A drop means a spec file was
       left behind by a `git mv`.
-- [ ] `pnpm --filter api test:e2e` → passes.
-- [ ] `pnpm --filter api build && pnpm --filter api start:prod` → boots, `/health/live` returns 200.
+- [x] `pnpm --filter api test:e2e` → passes.
+- [x] `pnpm --filter api build && pnpm --filter api start:prod` → boots, `/health/live` returns 200.
       **This is the first real test of `tsc-alias`** — the aliases are load-bearing from now on.
-- [ ] `grep -rn "@core/\|@modules/\|@shared/" apps/api/dist/` → no matches.
-- [ ] `pnpm db:up && pnpm db:migrate && pnpm db:seed` → both scripts complete against dev Postgres.
-- [ ] `pnpm --filter api db:generate` → reports no schema changes. If it wants to emit a migration,
+- [x] `grep -rn "@core/\|@modules/\|@shared/" apps/api/dist/` → no matches.
+- [x] `pnpm db:up && pnpm db:migrate && pnpm db:seed` → both scripts complete against dev Postgres.
+- [x] `pnpm --filter api db:generate` → reports no schema changes. If it wants to emit a migration,
       `drizzle.config.ts` is pointing at the wrong path and would generate a duplicate baseline.
-- [ ] `git diff --stat HEAD~1 -- '*.ts'` shows import-only line changes. Any deleted or added
+- [x] `git diff --stat HEAD~1 -- '*.ts'` shows import-only line changes. Any deleted or added
       function body means something other than a move crept in.
 
 ## Rollback
