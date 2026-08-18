@@ -69,7 +69,7 @@ export class ClerkAuthGuard implements CanActivate {
 
       // Just-in-Time (JIT) user provision/sync into local Postgres database
       const user = await this.usersService.ensureJitUser({
-        clerkId,
+        externalId: clerkId,
         email,
         role,
         firstName,

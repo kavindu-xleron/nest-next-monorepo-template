@@ -90,7 +90,7 @@ describe("UsersService", () => {
       repository.findByExternalId.mockResolvedValue(mockUser)
 
       const result = await service.ensureJitUser({
-        clerkId: "clerk_123",
+        externalId: "clerk_123",
         email: "test@example.com",
         role: "user",
         firstName: "Test",
@@ -109,7 +109,7 @@ describe("UsersService", () => {
       })
 
       const result = await service.ensureJitUser({
-        clerkId: "clerk_123",
+        externalId: "clerk_123",
         email: "test@example.com",
         role: "user",
         firstName: "UpdatedName",

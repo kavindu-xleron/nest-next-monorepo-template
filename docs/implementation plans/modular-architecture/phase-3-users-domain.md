@@ -256,6 +256,17 @@ in `presentation/` during Phase 5.
 - [ ] `create({ clerkId: ... })` → `create({ externalId: ... })`. Note `create()` in `UsersService`
       currently synthesises `clerk_dev_${Date.now()}_${random}` for admin-created users; keep that
       behaviour but name the field `externalId`.
+- [ ] **`ensureJitUser`'s payload parameter too** — rename its `clerkId` field to `externalId`, not
+      just the repository calls it makes. It is easy to miss because the method compiles fine either
+      way: the value gets renamed on the first line of the body and everything downstream is already
+      correct. But the parameter is the module's public surface, and leaving it means the one piece
+      of provider vocabulary left in `application/` is on the signature every caller sees. Phase 4's
+      `UserPrincipalResolver` passes `externalId: claims.subject`, so this has to change regardless
+      — doing it here keeps Phase 4 focused on the auth seam.
+
+      Four call sites move with it: `clerk-auth.guard.ts`, `clerk-webhook.controller.ts`, and their
+      two specs. All four use object shorthand (`clerkId,`) over a local named `clerkId`, so each
+      becomes `externalId: clerkId`.
 
 ### 3.4 New use case for Phase 5
 
@@ -376,9 +387,14 @@ preserving — keep the direct-construction style.
 
 - [ ] `pnpm --filter api lint typecheck test test:e2e` → green.
 - [ ] `grep -rn "import type.*Repository" apps/api/src` → no matches. See the warning in §1.3.
-- [ ] `grep -rn "clerkId" apps/api/src/modules` → matches **only** in
-      `infrastructure/drizzle/user.mapper.ts`. Anywhere else means provider naming leaked back into
-      the domain.
+- [ ] `grep -rn "clerkId" apps/api/src/modules/users/domain apps/api/src/modules/users/application`
+      → no matches. Provider naming must not survive above the infrastructure boundary.
+
+      Scoped to those two directories deliberately. `clerkId` **is** expected under
+      `infrastructure/drizzle/` — the mapper translates it, and the adapter has to name the column
+      to query it (`eq(users.clerkId, externalId)`). A repo-wide `grep` over `src/modules` produces
+      false positives on correct code and trains you to ignore it.
+
 - [ ] `grep -rn "as \"user\" | \"admin\"" apps/api/src` → no matches.
 - [ ] **Prove the swap.** Temporarily bind an in-memory fake in `users.module.ts`:
 

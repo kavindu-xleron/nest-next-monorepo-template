@@ -74,7 +74,7 @@ describe("ClerkWebhookController", () => {
 
     expect(result).toEqual({ success: true })
     expect(usersService.ensureJitUser).toHaveBeenCalledWith({
-      clerkId: "clerk_123",
+      externalId: "clerk_123",
       email: "webhook@example.com",
       role: "user",
       firstName: "Clerk",

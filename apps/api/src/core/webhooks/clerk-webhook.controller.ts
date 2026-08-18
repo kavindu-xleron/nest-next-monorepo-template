@@ -89,7 +89,7 @@ export class ClerkWebhookController {
       const lastName = data.last_name || null
 
       await this.usersService.ensureJitUser({
-        clerkId,
+        externalId: clerkId,
         email,
         role,
         firstName,

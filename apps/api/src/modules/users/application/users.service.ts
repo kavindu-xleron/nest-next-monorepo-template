@@ -117,13 +117,13 @@ export class UsersService {
    * Compares incoming payload against existing user to skip unnecessary database writes.
    */
   async ensureJitUser(payload: {
-    clerkId: string
+    externalId: string
     email: string
     role?: string
     firstName?: string | null
     lastName?: string | null
   }): Promise<UserDto> {
-    const externalId = payload.clerkId
+    const { externalId } = payload
     const existing = await this.usersRepository.findByExternalId(externalId)
     if (existing) {
       const targetRole: UserRole = payload.role
