@@ -2,7 +2,7 @@ import { ExecutionContext, UnauthorizedException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { Reflector } from "@nestjs/core"
 // eslint-disable-next-line no-restricted-imports -- removed in Phase 4 (auth strategy)
-import { UsersService } from "@modules/users/users.service"
+import { UsersService } from "@modules/users"
 import { ClerkAuthGuard } from "./clerk-auth.guard"
 
 describe("ClerkAuthGuard", () => {

@@ -14,9 +14,9 @@ import { Request } from "express"
 import { Webhook } from "svix"
 import { Public } from "@core/auth/decorators/public.decorator"
 // eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
-import { UsersRepository } from "@modules/users/users.repository"
+import { UsersRepository } from "@modules/users/domain/users.repository"
 // eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
-import { UsersService } from "@modules/users/users.service"
+import { UsersService } from "@modules/users"
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer
@@ -97,7 +97,7 @@ export class ClerkWebhookController {
       })
     } else if (eventType === "user.deleted") {
       const clerkId = data.id
-      const existing = await this.usersRepository.findByClerkId(clerkId)
+      const existing = await this.usersRepository.findByExternalId(clerkId)
       if (existing) {
         await this.usersRepository.softDelete(existing.id)
       }

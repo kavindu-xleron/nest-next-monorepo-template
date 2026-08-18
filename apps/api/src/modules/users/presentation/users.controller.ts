@@ -30,7 +30,7 @@ import {
   UpdateUserDto,
   UpdateUserMeDto,
 } from "./dto"
-import { UsersService } from "./users.service"
+import { UsersService } from "../application/users.service"
 
 @ApiTags("users")
 @Controller("users")

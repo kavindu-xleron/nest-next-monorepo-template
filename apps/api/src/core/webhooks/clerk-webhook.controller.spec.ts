@@ -1,8 +1,8 @@
 import { ConfigService } from "@nestjs/config"
 // eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
-import { UsersRepository } from "@modules/users/users.repository"
+import { UsersRepository } from "@modules/users/domain/users.repository"
 // eslint-disable-next-line no-restricted-imports -- removed in Phase 5 (webhooks)
-import { UsersService } from "@modules/users/users.service"
+import { UsersService } from "@modules/users"
 import { ClerkWebhookController } from "./clerk-webhook.controller"
 
 jest.mock("svix", () => {
@@ -35,7 +35,7 @@ describe("ClerkWebhookController", () => {
     } as unknown as jest.Mocked<UsersService>
 
     usersRepository = {
-      findByClerkId: jest.fn(),
+      findByExternalId: jest.fn(),
       softDelete: jest.fn(),
     } as unknown as jest.Mocked<UsersRepository>
 
@@ -83,7 +83,7 @@ describe("ClerkWebhookController", () => {
   })
 
   it("should process user.deleted event and soft delete user record", async () => {
-    usersRepository.findByClerkId.mockResolvedValue({
+    usersRepository.findByExternalId.mockResolvedValue({
       id: "user-1",
     } as any)
 

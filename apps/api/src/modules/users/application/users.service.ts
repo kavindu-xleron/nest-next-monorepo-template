@@ -10,8 +10,8 @@ import {
   UpdateUserDto,
   UserDto,
 } from "@workspace/contracts"
-import { User } from "@core/database/schema/users"
-import { UsersRepository } from "./users.repository"
+import { User, UserRole } from "../domain/user.entity"
+import { UsersRepository } from "../domain/users.repository"
 
 @Injectable()
 export class UsersService {
@@ -22,8 +22,8 @@ export class UsersService {
       return this.findOne(userId)
     }
 
-    const paginated = await this.usersRepository.findPaginated(undefined, 1)
-    const firstUser = paginated.items[0]
+    const page = await this.usersRepository.findPage(undefined, 1)
+    const firstUser = page.items[0]
     if (!firstUser) {
       throw new NotFoundException("No active user profile found")
     }
@@ -34,15 +34,12 @@ export class UsersService {
   async findAll(
     query: CursorPaginationQueryDto
   ): Promise<PaginatedResponseDto<UserDto>> {
-    const result = await this.usersRepository.findPaginated(
-      query.cursor,
-      query.limit
-    )
+    const page = await this.usersRepository.findPage(query.cursor, query.limit)
 
     return {
-      items: result.items.map((user) => this.toUserDto(user)),
-      nextCursor: result.nextCursor,
-      hasMore: result.hasMore,
+      items: page.items.map((user) => this.toUserDto(user)),
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
     }
   }
 
@@ -67,8 +64,8 @@ export class UsersService {
       firstName: dto.firstName || null,
       lastName: dto.lastName || null,
       avatarUrl: dto.avatarUrl || null,
-      role: dto.role || "user",
-      clerkId: `clerk_dev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      role: dto.role === "admin" ? "admin" : "user",
+      externalId: `clerk_dev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     })
 
     return this.toUserDto(created)
@@ -91,7 +88,9 @@ export class UsersService {
       ...(dto.firstName !== undefined && { firstName: dto.firstName }),
       ...(dto.lastName !== undefined && { lastName: dto.lastName }),
       ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
-      ...(dto.role !== undefined && { role: dto.role }),
+      ...(dto.role !== undefined && {
+        role: dto.role === "admin" ? "admin" : "user",
+      }),
     })
 
     if (!updated) {
@@ -106,8 +105,16 @@ export class UsersService {
     await this.usersRepository.softDelete(id)
   }
 
+  async removeByExternalId(externalId: string): Promise<void> {
+    const existing = await this.usersRepository.findByExternalId(externalId)
+    if (existing) {
+      await this.usersRepository.softDelete(existing.id)
+    }
+  }
+
   /**
    * Just-in-Time (JIT) provision/synchronization of local Postgres user record.
+   * Compares incoming payload against existing user to skip unnecessary database writes.
    */
   async ensureJitUser(payload: {
     clerkId: string
@@ -116,11 +123,34 @@ export class UsersService {
     firstName?: string | null
     lastName?: string | null
   }): Promise<UserDto> {
-    const existing = await this.usersRepository.findByClerkId(payload.clerkId)
+    const externalId = payload.clerkId
+    const existing = await this.usersRepository.findByExternalId(externalId)
     if (existing) {
+      const targetRole: UserRole = payload.role
+        ? payload.role === "admin"
+          ? "admin"
+          : "user"
+        : existing.role
+      const targetFirstName =
+        payload.firstName !== undefined ? payload.firstName : existing.firstName
+      const targetLastName =
+        payload.lastName !== undefined ? payload.lastName : existing.lastName
+
+      const drifted =
+        existing.email !== payload.email ||
+        existing.role !== targetRole ||
+        existing.firstName !== targetFirstName ||
+        existing.lastName !== targetLastName
+
+      if (!drifted) {
+        return this.toUserDto(existing)
+      }
+
       const updated = await this.usersRepository.update(existing.id, {
         email: payload.email,
-        ...(payload.role !== undefined && { role: payload.role }),
+        ...(payload.role !== undefined && {
+          role: payload.role === "admin" ? "admin" : "user",
+        }),
         ...(payload.firstName !== undefined && {
           firstName: payload.firstName,
         }),
@@ -134,8 +164,10 @@ export class UsersService {
     )
     if (existingByEmail) {
       const updated = await this.usersRepository.update(existingByEmail.id, {
-        clerkId: payload.clerkId,
-        ...(payload.role !== undefined && { role: payload.role }),
+        externalId,
+        ...(payload.role !== undefined && {
+          role: payload.role === "admin" ? "admin" : "user",
+        }),
         ...(payload.firstName !== undefined && {
           firstName: payload.firstName,
         }),
@@ -145,9 +177,9 @@ export class UsersService {
     }
 
     const created = await this.usersRepository.create({
-      clerkId: payload.clerkId,
+      externalId,
       email: payload.email,
-      role: payload.role || "user",
+      role: payload.role === "admin" ? "admin" : "user",
       firstName: payload.firstName || null,
       lastName: payload.lastName || null,
     })
@@ -156,8 +188,8 @@ export class UsersService {
   }
 
   /**
-   * Whitelisting: Transforms database User entity into public UserDto contract,
-   * guaranteeing internal fields (clerkId, deletedAt) are stripped.
+   * Whitelisting: Transforms domain User entity into public UserDto contract,
+   * guaranteeing internal fields (externalId, etc.) are stripped.
    */
   private toUserDto(user: User): UserDto {
     return {
@@ -166,7 +198,7 @@ export class UsersService {
       firstName: user.firstName,
       lastName: user.lastName,
       avatarUrl: user.avatarUrl,
-      role: user.role as "user" | "admin",
+      role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     }
