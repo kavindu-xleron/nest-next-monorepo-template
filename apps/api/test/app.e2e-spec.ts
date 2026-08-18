@@ -6,7 +6,7 @@ import { ZodValidationPipe } from "nestjs-zod"
 import request from "supertest"
 import { App } from "supertest/types"
 import { AppModule } from "../src/app.module"
-import { ClerkAuthGuard } from "../src/core/auth/guards/clerk-auth.guard"
+import { BearerAuthGuard } from "../src/core/auth/guards/bearer-auth.guard"
 
 describe("AppController & API Routes (e2e)", () => {
   let app: INestApplication<App>
@@ -24,7 +24,7 @@ describe("AppController & API Routes (e2e)", () => {
 
   beforeAll(async () => {
     jest
-      .spyOn(ClerkAuthGuard.prototype, "canActivate")
+      .spyOn(BearerAuthGuard.prototype, "canActivate")
       .mockImplementation(async (context: ExecutionContext) => {
         const req = context.switchToHttp().getRequest()
         req.user = mockUser
@@ -89,6 +89,39 @@ describe("AppController & API Routes (e2e)", () => {
 
     expect(res.body).toHaveProperty("id")
     expect(res.body).toHaveProperty("email")
+  })
+
+  it("GET /api/v1/users without auth header should return 401 Unauthorized", async () => {
+    const spy = jest.spyOn(BearerAuthGuard.prototype, "canActivate")
+    spy.mockRestore()
+
+    await request(app.getHttpServer()).get("/api/v1/users").expect(401)
+
+    jest
+      .spyOn(BearerAuthGuard.prototype, "canActivate")
+      .mockImplementation(async (context: ExecutionContext) => {
+        const req = context.switchToHttp().getRequest()
+        req.user = mockUser
+        return true
+      })
+  })
+
+  it("GET /api/v1/users with non-admin role should return 403 Forbidden", async () => {
+    const spy = jest
+      .spyOn(BearerAuthGuard.prototype, "canActivate")
+      .mockImplementation(async (context: ExecutionContext) => {
+        const req = context.switchToHttp().getRequest()
+        req.user = { ...mockUser, role: "user" }
+        return true
+      })
+
+    await request(app.getHttpServer()).get("/api/v1/users").expect(403)
+
+    spy.mockImplementation(async (context: ExecutionContext) => {
+      const req = context.switchToHttp().getRequest()
+      req.user = mockUser
+      return true
+    })
   })
 
   afterAll(async () => {

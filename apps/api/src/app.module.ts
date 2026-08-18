@@ -1,21 +1,26 @@
 import { Module } from "@nestjs/common"
-import { APP_GUARD } from "@nestjs/core"
 import { CoreModule } from "@core/core.module"
 import { AuthModule } from "@core/auth/auth.module"
-import { ClerkAuthGuard } from "@core/auth/guards/clerk-auth.guard"
-import { RolesGuard } from "@core/auth/guards/roles.guard"
+import { PrincipalResolver } from "@core/auth/ports/principal-resolver"
+import { TokenVerifier } from "@core/auth/ports/token-verifier"
+import { ClerkTokenVerifier } from "@core/auth/strategies/clerk/clerk-token-verifier"
 import { WebhooksModule } from "@core/webhooks/webhooks.module"
-import { UsersModule } from "@modules/users/users.module"
+import { UserPrincipalResolver, UsersModule } from "@modules/users"
 import { AppController } from "./app.controller"
 import { AppService } from "./app.service"
 
 @Module({
-  imports: [CoreModule, AuthModule, UsersModule, WebhooksModule],
-  controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ClerkAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
+  imports: [
+    CoreModule,
+    UsersModule,
+    AuthModule.register({
+      imports: [UsersModule],
+      verifier: { provide: TokenVerifier, useClass: ClerkTokenVerifier },
+      resolver: { provide: PrincipalResolver, useClass: UserPrincipalResolver },
+    }),
+    WebhooksModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
